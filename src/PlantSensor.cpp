@@ -1,5 +1,6 @@
 #line 2 "PlantSensor.cpp"
 
+
 #define TEST_UI
 //#define TEST_RUN
 
@@ -21,13 +22,14 @@
 #include <SPI.h>
 #include <WiFiUdp.h>
 #include <WiFi.h>
+#include <AsyncTCP.h>
+#include <nvs_flash.h>
 //#ifdef TEST_RUN
 //    #include <AUnit.h>
 //    #include "tests/testPreferenceManager.h"
 //#endif
-#include <AsyncTCP.h>
-#include <nvs_flash.h>
 //#include <Update.h>
+
 
 float akku = 0;
 char cakku[16] {};
@@ -45,8 +47,8 @@ uint16_t start_time = millis();
 uint16_t volatile current_time = millis();
 void setup()
 {
-
-    #if defined(DEBUG) || defined(TEST_RUN)
+    log_i("Starting");
+    #if defined(DEBUG) || defined(TEST_RUN) || defined(TEST_UI)
     Serial.begin(115200);
     #endif
 	/*WiFi.disconnect();
@@ -58,22 +60,23 @@ void setup()
 	wifi_station_connect();
 	*/
 #ifndef TEST_RUN
-    Serial.begin(115200);
 
-	pinMode(A0, INPUT);
+	pinMode(GPIO_AKKU_READ, INPUT);
     SettingsManager settingsManager = SettingsManager();
-
 #ifdef TEST_UI
     setup_espui(settingsManager);
     return;
 #endif
-//    if (settingsManager.firstStartUp()) setup_espui(); // is first start up?
-	WiFi.begin(ssid, password);
+    if (settingsManager.firstStartUp()) setup_espui(settingsManager); // is first start up?
+    settingsManager.getConfigNetwork();
+	WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
 	WiFi.persistent(false);
 	WiFi.mode(WIFI_OFF);
 	WiFi.mode(WIFI_STA);
-	WiFi.begin(ssid, password);
-	client.setServer(MQTT_SERVER, 1883);
+    WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
+	client.setServer(IPAddress().fromString(Settings::settingsNetwork.MqttServer.value), 1883);
+
+	settingsManager.getConfigScalesAll();
 
 
 	//int volatile * const p_reg = (int *) 0x60000808;
@@ -168,12 +171,12 @@ void loop()
 //    delay(5000);
 //    setup_espui(settingsManager);
 //    aunit::TestRunner::run();
-#ifdef TEST_RUN
-    aunit::TestRunner::run();
-#endif
-#ifndef TEST_RUN
-//	ESP.deepSleep(UPDATE_INTERVAL);
-#endif
+//#ifdef TEST_RUN
+//    aunit::TestRunner::run();
+//#endif
+//#ifndef TEST_RUN
+////	ESP.deepSleep(UPDATE_INTERVAL);
+//#endif
 	/*publishBME();
 	publishLux();
 	publishScale();
@@ -195,19 +198,6 @@ boolean checkAkku(float akku_measure)
 	return ((akku_measure * R_AKKU + O_AKKU) < SHUTDOWN_VOLTAGE);
 }
 
-void inline readAkku(int iter) {
-	akku = 0;
-	for (int i = 1; i < iter; i++) {
-		akku += analogRead(A0);
-		delay(5);
-	}
-	akku = akku / iter;
-	snprintf(cakku, sizeof(cakku), "%.1f", akku);
-#ifdef debug
-	Serial.print("Akku: ");
-	Serial.println(cakku);
-#endif
-}
 
 void inline readScale() {
 	for (int i = 0; i < NrOfScales; i++) {

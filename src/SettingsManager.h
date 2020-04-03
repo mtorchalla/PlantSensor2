@@ -1,13 +1,8 @@
-//
-// Created by Moritz on 22.03.2020.
-//
-
 #ifndef PLANTSENSOR_SETTINGSMANAGER_H
 #define PLANTSENSOR_SETTINGSMANAGER_H
 
 #include <Arduino.h>
 #include <Preferences.h>
-
 template<typename T>
 struct EepParameter {
     T value;
@@ -25,6 +20,7 @@ typedef struct {
     EepParameter<String> WifiSSid;
     EepParameter<String> WifiPass;
     EepParameter<String> MqttServer;
+    EepParameter<uint16_t> MqttPort;
     EepParameter<String> MqttUser;
     EepParameter<String> MqttPass;
     EepParameter<uint8_t> UpdateInterval;
@@ -62,6 +58,10 @@ public:
     void updateConfigNetwork(EepStructNetwork& networkSettings);
     boolean firstStartUp();
     boolean existScale(EepStructScale &eepStructScale);
+    template<typename T>
+    void saveValue(EepParameter<T> &eepParameter);
+    template<typename T>
+    T loadValue(EepParameter<T> &eepParameter);
 
 private:
     Preferences preferences;
@@ -72,7 +72,17 @@ private:
     String getString(const char* eepName);
     uint8_t getUChar(EepParameter<uint8_t> &eepParameter);
     uint8_t getUChar(const char *eepName);
+
 };
 
+template<> uint8_t SettingsManager::loadValue(EepParameter<uint8_t > &eepParameter);
+template<> uint16_t SettingsManager::loadValue(EepParameter<uint16_t > &eepParameter);
+template<> float SettingsManager::loadValue(EepParameter<float > &eepParameter);
+template<> String SettingsManager::loadValue(EepParameter<String> &eepParameter);
+
+template<> void SettingsManager::saveValue(EepParameter<uint8_t > &eepParameter);
+template<> void SettingsManager::saveValue(EepParameter<uint16_t > &eepParameter);
+template<> void SettingsManager::saveValue(EepParameter<float > &eepParameter);
+template<> void SettingsManager::saveValue(EepParameter<String> &eepParameter);
 
 #endif //PLANTSENSOR_SETTINGSMANAGER_H

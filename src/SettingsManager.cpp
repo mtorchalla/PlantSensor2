@@ -1,11 +1,16 @@
 #include "SettingsManager.h"
-#include "WebUi.h"
 
+//template<typename T, typename U>   //Typen ungleich, gibt 0 zurück
+//struct is_same
+//{
+//    enum { value = 0 };
+//};
 
 EepStructNetwork Settings::settingsNetwork = {
         EepParameter<String>{"", "WifiSSid"},
         EepParameter<String>{"", "WifiPass"},
         EepParameter<String>{"", "MqttServer"},
+        EepParameter<uint16_t>{1883, "MqttPort"},
         EepParameter<String>{"", "MqttUser"},
         EepParameter<String>{"", "MqttPass"},
         EepParameter<uint8_t>{15, "UpdateInterval"}
@@ -25,7 +30,6 @@ EepStructScale Settings::settingsScale10 = {EepParameter<float> {0.0, "ScaleOffs
 
 SettingsManager::SettingsManager() {
     preferences.begin("SettingsManager");
-    Serial.println("BEGINSETTINGS");
 }
 
 void SettingsManager::getConfigScalesAll() {
@@ -59,6 +63,7 @@ void SettingsManager::getConfigNetwork(EepStructNetwork &networkSettings) {
         networkSettings.WifiSSid.value = this->getString(networkSettings.WifiSSid.eepName);
         networkSettings.WifiPass.value = this->getString(networkSettings.WifiPass.eepName);
         networkSettings.MqttServer.value = this->getString(networkSettings.MqttServer.eepName);
+        networkSettings.MqttPort.value = this->preferences.getShort(networkSettings.MqttServer.eepName);
         networkSettings.MqttUser.value = this->getString(networkSettings.MqttUser.eepName);
         networkSettings.MqttPass.value = this->getString(networkSettings.MqttPass.eepName);
         networkSettings.UpdateInterval.value = this->getUChar(networkSettings.UpdateInterval.eepName);
@@ -97,10 +102,12 @@ void SettingsManager::updateConfigNetwork(EepStructNetwork &networkSettings) {
     this->putString(networkSettings.WifiSSid);
     this->putString(networkSettings.WifiPass);
     this->putString(networkSettings.MqttServer);
+    this->preferences.putShort(networkSettings.MqttPort.eepName, networkSettings.MqttPort.value);
     this->putString(networkSettings.MqttUser);
     this->putString(networkSettings.MqttPass);
     this->putUChar(networkSettings.UpdateInterval);
 }
+
 
 void SettingsManager::putString(EepParameter<String> &eepParameter) {
     this->preferences.putString(eepParameter.eepName, eepParameter.value);
@@ -137,3 +144,80 @@ boolean SettingsManager::firstStartUp() {
 boolean SettingsManager::existScale(EepStructScale &eepStructScale) {
     return this->preferences.getFloat(eepStructScale.ScaleInUse.eepName, 0);
 }
+
+//template<typename T>
+//void SettingsManager::saveValue(EepParameter<T> &eepParameter) {
+//    if (is_same<uint8_t, decltype(eepParameter.value)>::value) {
+//        this->preferences.putUChar(eepParameter.eepName, eepParameter.value);
+//    }
+//    if (is_same<float, decltype(eepParameter.value)>::value) {
+//        this->preferences.putFloat(eepParameter.eepName, eepParameter.value);
+//    }
+//    if (is_same<String, decltype(eepParameter.value)>::value) {
+//        this->preferences.putString(eepParameter.eepName, eepParameter.value);
+//    }
+//    if (is_same<const char*, decltype(eepParameter.value)>::value) {
+//        this->preferences.putString(eepParameter.eepName, eepParameter.value);
+//    }
+//}
+
+template<> bool SettingsManager::loadValue(EepParameter<bool> &eepParameter) {
+    log_i("SettingsManager: Loading Parameter: %s; Value: %i", eepParameter.eepName, eepParameter.value);
+    return this->preferences.getBool(eepParameter.eepName, 0);
+}
+template<> uint8_t SettingsManager::loadValue(EepParameter<uint8_t > &eepParameter) {
+    log_i("SettingsManager: Loading Parameter: %s; Value: %i", eepParameter.eepName, eepParameter.value);
+    return this->preferences.getUChar(eepParameter.eepName, 0);
+}
+template<> uint16_t SettingsManager::loadValue(EepParameter<uint16_t > &eepParameter) {
+    log_i("SettingsManager: Loading Parameter: %s; Value: %i", eepParameter.eepName, eepParameter.value);
+    return this->preferences.getShort(eepParameter.eepName, 0);
+}
+template<> float SettingsManager::loadValue(EepParameter<float > &eepParameter) {
+    log_i("SettingsManager: Loading Parameter: %s; Value: %f", eepParameter.eepName, eepParameter.value);
+    return this->preferences.getFloat(eepParameter.eepName, 0);
+}
+template<> String SettingsManager::loadValue(EepParameter<String> &eepParameter) {
+    log_i("SettingsManager: Loading Parameter: %s; Value: %s", eepParameter.eepName, eepParameter.value);
+    return this->preferences.getString(eepParameter.eepName, "");
+}
+
+template<> void SettingsManager::saveValue(EepParameter<bool> &eepParameter) {
+    log_i("SettingsManager: Saving Parameter: %s; Value: %i", eepParameter.eepName, eepParameter.value);
+    this->preferences.putBool(eepParameter.eepName, eepParameter.value);
+}
+template<> void SettingsManager::saveValue(EepParameter<uint8_t> &eepParameter) {
+    log_i("SettingsManager: Saving Parameter: %s; Value: %i", eepParameter.eepName, eepParameter.value);
+    this->preferences.putUChar(eepParameter.eepName, eepParameter.value);
+}
+template<> void SettingsManager::saveValue(EepParameter<uint16_t> &eepParameter) {
+    log_i("SettingsManager: Saving Parameter: %s; Value: %i", eepParameter.eepName, eepParameter.value);
+    this->preferences.putShort(eepParameter.eepName, eepParameter.value);
+}
+template<> void SettingsManager::saveValue(EepParameter<float> &eepParameter) {
+    log_i("SettingsManager: Saving Parameter: %s; Value: %f", eepParameter.eepName, eepParameter.value);
+    this->preferences.putFloat(eepParameter.eepName, eepParameter.value);
+}
+template<> void SettingsManager::saveValue(EepParameter<String> &eepParameter) {
+    log_i("SettingsManager: Saving Parameter: %s; Value: %s", eepParameter.eepName, eepParameter.value);
+    this->preferences.putString(eepParameter.eepName, eepParameter.value);
+}
+
+
+//template<typename T>
+//T SettingsManager::loadValue(EepParameter<T> &eepParameter) {
+//    if (is_same<uint8_t, decltype(eepParameter.value)>::value) {
+//        return (T)this->preferences.getUChar(eepParameter.eepName, 0);
+//    }
+//    if (is_same<float, decltype(eepParameter.value)>::value) {
+//        return (T)this->preferences.getFloat(eepParameter.eepName, 0);
+//    }
+//    if (is_same<String, decltype(eepParameter.value)>::value) {
+//        return static_cast<T>(this->preferences.getString(eepParameter.eepName, ""));
+//    }
+//    if (is_same<const char*, decltype(eepParameter.value)>::value) {
+//        return (T)this->preferences.getString(eepParameter.eepName, "");
+//    }
+//}
+
+
