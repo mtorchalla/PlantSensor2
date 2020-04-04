@@ -67,10 +67,10 @@ public:
         return String(this->eepParameter->value);
     }
     void setEepParameter(String value) {
-        Serial.print("Setting Parameter: ");
-        Serial.println(value);
+//        Serial.print("Setting Parameter: ");
+//        Serial.println(value);
         this->_saveEepParameter(this->eepParameter, value);
-        Serial.println(this->eepParameter->value);
+//        Serial.println(this->eepParameter->value);
     }
     void saveEepParameter(SettingsManager &settingsManager) {
         settingsManager.saveValue(*(this->eepParameter));

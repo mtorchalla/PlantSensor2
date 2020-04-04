@@ -7,7 +7,7 @@
 #include <nvs_flash.h>
 #include "SettingsManager.h"
 #include "PlantSensor.h"
-#include "ConfigAkku.h"
+#include "ConfigBattery.h"
 #include <WiFi.h>
 #include "ListUiElementWithSettings.h"
 
@@ -42,11 +42,14 @@ typedef struct {
 void loadSettingsToUi();
 void saveAndQuit(Control *sender, int type);
 void saveTabCallback(Control* sender, int type);
-void updateAkku();
+void updateBatteryLevel();
 void setup_espui(SettingsManager& newSettingsManager);
 void loop_espui();
 void setupTabs();
 void setupNetworkTab(uint16_t networkTab);
+void setupBatteryTab(uint16_t parentTab);
+void setupBMETab(uint16_t parentTab);
+void setupLuxTab(uint16_t parentTab);
 void setupScalesTab(uint16_t parentTab, ScalesTab &scalesTab, ListUiElementWithSettings &tabScale, EepStructScale &eepStructScale, String scaleNumber);
 void activateScale(Control *sender, int type);
 void switchScaleElements(ScalesTab &scalesTab, String value);

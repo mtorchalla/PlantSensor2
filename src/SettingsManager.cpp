@@ -6,26 +6,31 @@
 //    enum { value = 0 };
 //};
 
-EepStructNetwork Settings::settingsNetwork = {
-        EepParameter<String>{"", "WifiSSid"},
-        EepParameter<String>{"", "WifiPass"},
-        EepParameter<String>{"", "MqttServer"},
-        EepParameter<uint16_t>{1883, "MqttPort"},
-        EepParameter<String>{"", "MqttUser"},
-        EepParameter<String>{"", "MqttPass"},
-        EepParameter<uint8_t>{15, "UpdateInterval"}
+RTC_DATA_ATTR EepStructNetwork Settings::settingsNetwork = {
+    EepParameter<String>{"", "WifiSSid"},
+    EepParameter<String>{"", "WifiPass"},
+    EepParameter<String>{"", "MqttServer"},
+    EepParameter<uint16_t>{1883, "MqttPort"},
+    EepParameter<String>{"", "MqttUser"},
+    EepParameter<String>{"", "MqttPass"},
+    EepParameter<String>{"", "MqttName"},
+    EepParameter<uint8_t>{15, "UpdateInterval"}
 };
 
-EepStructScale Settings::settingsScale1 = {EepParameter<float> {0.0, "ScaleOffset1"}, EepParameter<float> {0.0, "ScaleScale1"}, EepParameter<String> {"", "ScaleMqttUri1"}, EepParameter<bool> {false, "ScaleInUse1"}};
-EepStructScale Settings::settingsScale2 = {EepParameter<float> {0.0, "ScaleOffset2"}, EepParameter<float> {0.0, "ScaleScale2"}, EepParameter<String> {"", "ScaleMqttUri2"}, EepParameter<bool> {false, "ScaleInUse2"}};
-EepStructScale Settings::settingsScale3 = {EepParameter<float> {0.0, "ScaleOffset3"}, EepParameter<float> {0.0, "ScaleScale3"}, EepParameter<String> {"", "ScaleMqttUri3"}, EepParameter<bool> {false, "ScaleInUse3"}};
-EepStructScale Settings::settingsScale4 = {EepParameter<float> {0.0, "ScaleOffset4"}, EepParameter<float> {0.0, "ScaleScale4"}, EepParameter<String> {"", "ScaleMqttUri4"}, EepParameter<bool> {false, "ScaleInUse4"}};
-EepStructScale Settings::settingsScale5 = {EepParameter<float> {0.0, "ScaleOffset5"}, EepParameter<float> {0.0, "ScaleScale5"}, EepParameter<String> {"", "ScaleMqttUri5"}, EepParameter<bool> {false, "ScaleInUse5"}};
-EepStructScale Settings::settingsScale6 = {EepParameter<float> {0.0, "ScaleOffset6"}, EepParameter<float> {0.0, "ScaleScale6"}, EepParameter<String> {"", "ScaleMqttUri6"}, EepParameter<bool> {false, "ScaleInUse6"}};
-EepStructScale Settings::settingsScale7 = {EepParameter<float> {0.0, "ScaleOffset7"}, EepParameter<float> {0.0, "ScaleScale7"}, EepParameter<String> {"", "ScaleMqttUri7"}, EepParameter<bool> {false, "ScaleInUse7"}};
-EepStructScale Settings::settingsScale8 = {EepParameter<float> {0.0, "ScaleOffset8"}, EepParameter<float> {0.0, "ScaleScale8"}, EepParameter<String> {"", "ScaleMqttUri8"}, EepParameter<bool> {false, "ScaleInUse8"}};
-EepStructScale Settings::settingsScale9 = {EepParameter<float> {0.0, "ScaleOffset9"}, EepParameter<float> {0.0, "ScaleScale9"}, EepParameter<String> {"", "ScaleMqttUri9"}, EepParameter<bool> {false, "ScaleInUse9"}};
-EepStructScale Settings::settingsScale10 = {EepParameter<float> {0.0, "ScaleOffset10"}, EepParameter<float> {0.0, "ScaleScale10"}, EepParameter<String> {"", "ScaleMqttUri10"}, EepParameter<bool> {false, "ScaleInUse10"}};
+EepStructBattery Settings::settingsBattery = { EepParameter<String> { "", "MqttUri" }, EepParameter<String> { "", "MqttUriLow" } };
+EepStructBme Settings::settingsBme = { EepParameter<String> { "", "MqttUriTemp" }, EepParameter<String> { "", "MqttUriHum" }, EepParameter<String> { "", "MqttUriPres" } };
+EepStructLux Settings::settingsLux = { EepParameter<String> { "", "MqttUri" } };
+
+RTC_DATA_ATTR EepStructScale Settings::settingsScale1 = {EepParameter<float> {0.0, "ScaleOffset1"}, EepParameter<float> {0.0, "ScaleScale1"}, EepParameter<String> {"", "ScaleMqttUri1"}, EepParameter<bool> {false, "ScaleInUse1"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale2 = {EepParameter<float> {0.0, "ScaleOffset2"}, EepParameter<float> {0.0, "ScaleScale2"}, EepParameter<String> {"", "ScaleMqttUri2"}, EepParameter<bool> {false, "ScaleInUse2"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale3 = {EepParameter<float> {0.0, "ScaleOffset3"}, EepParameter<float> {0.0, "ScaleScale3"}, EepParameter<String> {"", "ScaleMqttUri3"}, EepParameter<bool> {false, "ScaleInUse3"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale4 = {EepParameter<float> {0.0, "ScaleOffset4"}, EepParameter<float> {0.0, "ScaleScale4"}, EepParameter<String> {"", "ScaleMqttUri4"}, EepParameter<bool> {false, "ScaleInUse4"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale5 = {EepParameter<float> {0.0, "ScaleOffset5"}, EepParameter<float> {0.0, "ScaleScale5"}, EepParameter<String> {"", "ScaleMqttUri5"}, EepParameter<bool> {false, "ScaleInUse5"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale6 = {EepParameter<float> {0.0, "ScaleOffset6"}, EepParameter<float> {0.0, "ScaleScale6"}, EepParameter<String> {"", "ScaleMqttUri6"}, EepParameter<bool> {false, "ScaleInUse6"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale7 = {EepParameter<float> {0.0, "ScaleOffset7"}, EepParameter<float> {0.0, "ScaleScale7"}, EepParameter<String> {"", "ScaleMqttUri7"}, EepParameter<bool> {false, "ScaleInUse7"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale8 = {EepParameter<float> {0.0, "ScaleOffset8"}, EepParameter<float> {0.0, "ScaleScale8"}, EepParameter<String> {"", "ScaleMqttUri8"}, EepParameter<bool> {false, "ScaleInUse8"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale9 = {EepParameter<float> {0.0, "ScaleOffset9"}, EepParameter<float> {0.0, "ScaleScale9"}, EepParameter<String> {"", "ScaleMqttUri9"}, EepParameter<bool> {false, "ScaleInUse9"}};
+RTC_DATA_ATTR EepStructScale Settings::settingsScale10 = {EepParameter<float> {0.0, "ScaleOffset10"}, EepParameter<float> {0.0, "ScaleScale10"}, EepParameter<String> {"", "ScaleMqttUri10"}, EepParameter<bool> {false, "ScaleInUse10"}};
 
 
 SettingsManager::SettingsManager() {
@@ -66,12 +71,34 @@ void SettingsManager::getConfigNetwork(EepStructNetwork &networkSettings) {
         networkSettings.MqttPort.value = this->preferences.getShort(networkSettings.MqttServer.eepName);
         networkSettings.MqttUser.value = this->getString(networkSettings.MqttUser.eepName);
         networkSettings.MqttPass.value = this->getString(networkSettings.MqttPass.eepName);
+        networkSettings.MqttName.value = this->getString(networkSettings.MqttName.eepName);
         networkSettings.UpdateInterval.value = this->getUChar(networkSettings.UpdateInterval.eepName);
     }
 //    if (dataLen == sizeof(EepStructNetwork)) { // simple check that data fits
 //        return nullptr; // data for scaleNr is not set, first startup!
 //    }
 //    auto* networkSettings = (EepStructNetwork*) buffer; // cast the bytes into a struct ptr
+}
+
+void SettingsManager::getConfigBattery() {
+    if (!this->firstStartUp()) {
+        Settings::settingsBattery.MqttUri.value = this->getString(Settings::settingsBattery.MqttUri.eepName);
+        Settings::settingsBattery.MqttUriLow.value = this->getString(Settings::settingsBattery.MqttUriLow.eepName);
+    }
+}
+
+void SettingsManager::getConfigLux() {
+    if (!this->firstStartUp()) {
+        Settings::settingsLux.MqttUri.value = this->getString(Settings::settingsLux.MqttUri.eepName);
+    }
+}
+
+void SettingsManager::getConfigBme() {
+    if (!this->firstStartUp()) {
+        Settings::settingsBme.MqttUriTemp.value = this->getString(Settings::settingsBme.MqttUriTemp.eepName);
+        Settings::settingsBme.MqttUriHum.value = this->getString(Settings::settingsBme.MqttUriHum.eepName);
+        Settings::settingsBme.MqttUriPres.value = this->getString(Settings::settingsBme.MqttUriPres.eepName);
+    }
 }
 
 void SettingsManager::updateConfigScalesAll() {
@@ -105,6 +132,7 @@ void SettingsManager::updateConfigNetwork(EepStructNetwork &networkSettings) {
     this->preferences.putShort(networkSettings.MqttPort.eepName, networkSettings.MqttPort.value);
     this->putString(networkSettings.MqttUser);
     this->putString(networkSettings.MqttPass);
+    this->putString(networkSettings.MqttName);
     this->putUChar(networkSettings.UpdateInterval);
 }
 
@@ -186,6 +214,7 @@ template<> void SettingsManager::saveValue(EepParameter<bool> &eepParameter) {
     log_i("SettingsManager: Saving Parameter: %s; Value: %i", eepParameter.eepName, eepParameter.value);
     this->preferences.putBool(eepParameter.eepName, eepParameter.value);
 }
+
 template<> void SettingsManager::saveValue(EepParameter<uint8_t> &eepParameter) {
     log_i("SettingsManager: Saving Parameter: %s; Value: %i", eepParameter.eepName, eepParameter.value);
     this->preferences.putUChar(eepParameter.eepName, eepParameter.value);

@@ -8,45 +8,83 @@
 #include "PlantSensor.h"
 #include "ConfigSensorTemp.h"
 #include "ConfigScale.h"
-#include "ConfigAkku.h"
+#include "ConfigBattery.h"
 #include "ConfigWifi.h"
 #include "WebUi.h"
 #include "SettingsManager.h"
-#include <BME280I2C.h>
 #include <Wire.h>
 #include "Max44009.h"
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
-#include <HX711.h>
 #include "Settings.h"
 #include <SPI.h>
-#include <WiFiUdp.h>
 #include <WiFi.h>
-#include <AsyncTCP.h>
 #include <nvs_flash.h>
 //#ifdef TEST_RUN
 //    #include <AUnit.h>
 //    #include "tests/testPreferenceManager.h"
 //#endif
 //#include <Update.h>
+//#include <AsyncTCP.h>
+//#include <WiFiUdp.h>
+//#include <BME280I2C.h>
+//#include <HX711.h>
 
 
-float akku = 0;
-char cakku[16] {};
+float batteryLevel = 0;
+char batteryLevelBuffer[16] {};
+float luxValue = 0;
+float scaleValue;
+
+RTC_DATA_ATTR static char bufferWifiSSid[32] = "";
+RTC_DATA_ATTR static char bufferWifiPass[64] = "";
+RTC_DATA_ATTR static char bufferMqttServer[64] = "";
+RTC_DATA_ATTR static char bufferMqttUser[64] = "";
+RTC_DATA_ATTR static char bufferMqttPass[64] = "";
+RTC_DATA_ATTR static char bufferMqttName[64] = "";
+// MQTT URIs
+RTC_DATA_ATTR static char bufferMqttUriBattery[128] = "";
+RTC_DATA_ATTR static char bufferMqttUriBatteryLow[128] = "";
+RTC_DATA_ATTR static char bufferMqttUriTemp[128] = "";
+RTC_DATA_ATTR static char bufferMqttUriHum[128] = "";
+RTC_DATA_ATTR static char bufferMqttUriPres[128] = "";
+RTC_DATA_ATTR static char bufferMqttUriLux[128] = "";
+
 
 Max44009 SensorLux(0x4A, 4, 5);
 #define luxMid 5
-char clux[16];
+char luxBuffer[16];
 
+RTC_DATA_ATTR bool firstStart = true;
 
 //#define mqtt_topics_len 6
-//char const* mqtt_topics[mqtt_topics_len] = { "/home/balkon/temp/", "/home/balkon/hum/", "/home/balkon/pres/", "/home/balkon/lux/", "/home/balkon/akku/", "/home/balkon/haengekasten_rechts/" };
-
+//char const* mqtt_topics[mqtt_topics_len] = { "/home/balkon/temp/", "/home/balkon/hum/", "/home/balkon/pres/", "/home/balkon/lux/", "/home/balkon/batteryLevel/", "/home/balkon/haengekasten_rechts/" };
 
 uint16_t start_time = millis();
 uint16_t volatile current_time = millis();
-void setup()
-{
+IPAddress mqttServerAddress;
+
+void setupScales_(EepStructScale &eepStructScale, Scale &scale) {
+    scale.scale = eepStructScale.ScaleScale.value;
+    scale.offset = eepStructScale.ScaleOffset.value;
+    scale.mqttUri = eepStructScale.ScaleMqttUri.value.c_str();
+}
+
+void setupScales() {
+    setupScales_(Settings::settingsScale1, Scale1);
+    setupScales_(Settings::settingsScale2, Scale2);
+    setupScales_(Settings::settingsScale3, Scale3);
+    setupScales_(Settings::settingsScale4, Scale4);
+    setupScales_(Settings::settingsScale5, Scale5);
+    setupScales_(Settings::settingsScale6, Scale6);
+    setupScales_(Settings::settingsScale7, Scale7);
+    setupScales_(Settings::settingsScale8, Scale8);
+    setupScales_(Settings::settingsScale9, Scale9);
+    setupScales_(Settings::settingsScale10, Scale10);
+}
+
+void setup() {
+    pinMode(GPIO_Battery_READ, INPUT);
     log_i("Starting");
     #if defined(DEBUG) || defined(TEST_RUN) || defined(TEST_UI)
     Serial.begin(115200);
@@ -60,24 +98,54 @@ void setup()
 	wifi_station_connect();
 	*/
 #ifndef TEST_RUN
-
-	pinMode(GPIO_AKKU_READ, INPUT);
     SettingsManager settingsManager = SettingsManager();
 #ifdef TEST_UI
     setup_espui(settingsManager);
     return;
 #endif
-    if (settingsManager.firstStartUp()) setup_espui(settingsManager); // is first start up?
-    settingsManager.getConfigNetwork();
-	WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
+    if (firstStart && settingsManager.firstStartUp()) setup_espui(settingsManager); // is first start up ever?
+    if (firstStart) { // is not startup after deep sleep?
+        settingsManager.getConfigNetwork();
+        settingsManager.getConfigBattery();
+        settingsManager.getConfigBme();
+        settingsManager.getConfigLux();
+        strcpy(bufferWifiSSid, Settings::settingsNetwork.WifiSSid.value.c_str());
+        strcpy(bufferWifiPass, Settings::settingsNetwork.WifiPass.value.c_str());
+        strcpy(bufferMqttServer, Settings::settingsNetwork.MqttServer.value.c_str());
+        strcpy(bufferMqttUser, Settings::settingsNetwork.MqttUser.value.c_str());
+        strcpy(bufferMqttPass, Settings::settingsNetwork.MqttPass.value.c_str());
+        strcpy(bufferMqttName, Settings::settingsNetwork.MqttName.value.c_str());
+        strcpy(bufferMqttUriBattery, Settings::settingsBattery.MqttUri.value.c_str());
+        strcpy(bufferMqttUriTemp, Settings::settingsBme.MqttUriTemp.value.c_str());
+        strcpy(bufferMqttUriHum, Settings::settingsBme.MqttUriHum.value.c_str());
+        strcpy(bufferMqttUriPres, Settings::settingsBme.MqttUriPres.value.c_str());
+//        strcpy(bufferMqttUriScale1, Settings::settingsScale1.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale2, Settings::settingsScale2.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale3, Settings::settingsScale3.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale4, Settings::settingsScale4.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale5, Settings::settingsScale5.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale6, Settings::settingsScale6.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale7, Settings::settingsScale7.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale8, Settings::settingsScale8.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale9, Settings::settingsScale9.ScaleMqttUri.value.c_str());
+//        strcpy(bufferMqttUriScale10, Settings::settingsScale10.ScaleMqttUri.value.c_str());
+        settingsManager.getConfigScalesAll();
+        setupScales();
+        firstStart = false;
+    }
+    log_d("Starting normal routine");
+    WiFi.mode(WIFI_STA);
+	WiFi.begin(bufferWifiSSid, bufferWifiPass);
 	WiFi.persistent(false);
-	WiFi.mode(WIFI_OFF);
-	WiFi.mode(WIFI_STA);
-    WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
-	client.setServer(IPAddress().fromString(Settings::settingsNetwork.MqttServer.value), 1883);
+	log_d("Wifi started: %s, %s", bufferWifiSSid, bufferWifiPass);
+//	  WiFi.mode(WIFI_OFF);
+//	  WiFi.mode(WIFI_STA);
+//    WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
+    log_d("Setting mqtt server: %s Port: %i", bufferMqttServer, Settings::settingsNetwork.MqttPort.value);
 
-	settingsManager.getConfigScalesAll();
-
+    mqttServerAddress.fromString(bufferMqttServer);
+    myMqttClient.setServer(mqttServerAddress, 1883);
+    log_d("Server IP is: %d", mqttServerAddress.toString().c_str());
 
 	//int volatile * const p_reg = (int *) 0x60000808;
 	//*p_reg = 0b000010010 | GPOS;
@@ -86,179 +154,135 @@ void setup()
 	//digitalWrite(13, HIGH);
 	//delay(3000);
 
-	readAkku(10);
+    readBatteryLevel(8);
 	readLux();
-	readScale();
+//    readScales();
 	readBME();
 
 	volatile bool connected = false;
 	current_time = millis();
 	start_time = millis();
 	volatile uint8_t retries = 0;
-	while (connected == false && retries <= 2)
-	{
+	log_d("Connecting to network...");
+	while (connected == false && retries <= 2) {
 		connected = reconnect();
-		delay(500);
-#ifdef debug
-		Serial.print("Number of retries: ");
-		Serial.println(retries);
-		Serial.println(connected);
-#endif
+		delay(100);
+		log_d("Number of retries: %i", retries);
 		retries++;
 	}
 
 	if (connected) {
 		//Publish all values:
 		//TODO Add Timeout 
-		client.publish(MQTT_TOPIC_AKKU, cakku);
-		client.publish(MQTT_TOPIC_AKKU_LOW, "0");
+        myMqttClient.publish(bufferMqttUriBattery, batteryLevelBuffer);
+        myMqttClient.publish(bufferMqttUriBatteryLow, "0");
 		for (int i = 0; i < NrOfScales; i++) {
-			client.publish(Scales[i]->mqttUri, Scales[i]->cscale);
-#ifdef debug
-			Serial.println(Scales[i]->cscale);
-#endif
+            myMqttClient.publish(Scales[i]->mqttUri, Scales[i]->scaleValueBuffer);
+			log_d("Publishing Scale Value: %s", Scales[i]->scaleValueBuffer);
 		}
-		client.publish(MQTT_TOPIC_LUX, clux);
-		client.publish(MQTT_TOPIC_TEMPERATURE, ctemp);
-		client.publish(MQTT_TOPIC_HUMIDITY, chum);
-		client.publish(MQTT_TOPIC_PRESSURE, cpres);
-#ifdef debug
-		Serial.print("Published. Akku:");
-		Serial.println(cakku);
-		Serial.println("Sleeping...");
-#endif
-		//client.loop();
+        myMqttClient.publish(bufferMqttUriLux, luxBuffer);
+        myMqttClient.publish(bufferMqttUriTemp, tempValueBuffer);
+        myMqttClient.publish(bufferMqttUriHum, humValueBuffer);
+        myMqttClient.publish(bufferMqttUriPres, presValueBuffer);
+		log_d("Publishing Battery Level: %s, going to sleep...", batteryLevelBuffer);
 	}
 
-	if (digitalRead(0) == 0) debug_menu();
+	if (digitalRead(0) == 0) {
+        delay(50);
+        if (digitalRead(0) == 0) debug_menu();
+    }
 
 	//DeepSleep:
-	if (checkAkku(akku)) {
-		float akku_cum = 0;
-		for (int i = 0; i < 5; i++)
-		{
-			readAkku(10);
-			akku_cum += akku;
-		}
-		if (checkAkku(akku_cum / 5)) {
-#ifdef debug
-			Serial.print("Low Voltage detected: ");
-			Serial.println((akku * R_AKKU + O_AKKU) / 1000);
-			Serial.println("Sleeping forever...");
-#endif
-			client.publish(MQTT_TOPIC_AKKU_LOW, "1");
-			digitalWrite(ScaleSCK, HIGH);
-			delay(500);  // wait for safety
-			ESP.deepSleep(0);
+	if (checkBatteryLevelWarning()) {
+        readBatteryLevel(8);
+        if (checkBatteryLevelWarning()) {
+		    log_d("Low Voltage detected: %f", getBatteryVoltage());
+            myMqttClient.publish(bufferMqttUriBatteryLow, "1");
+            if (checkBatteryLevelLow()) {
+                digitalWrite(SCALE_SCK, HIGH);
+                waitUntilPublished();
+                ESP.deepSleep(0);
+            }
 		}
 	}
 
-	//client.flush();
-	digitalWrite(ScaleSCK, HIGH);	// set scales to sleep
-	delay(500);						// wait for safety
-	
+    waitUntilPublished();
+
 	ESP.deepSleep(UPDATE_INTERVAL);
 #endif
 }
 
+inline void waitUntilPublished() {
+    myMqttClient.disconnect();
+    myEspClient.flush();
+    while(myMqttClient.state() != -1)
+        delay(10);
+}
 
 void loop()
 {
 
-//    SettingsManager settingsManager = SettingsManager();
-//    Serial.println(1);
-//    Serial.println(settingsManager.firstStartUp());
-//    delay(5000);
-//    setup_espui(settingsManager);
-//    aunit::TestRunner::run();
-//#ifdef TEST_RUN
-//    aunit::TestRunner::run();
-//#endif
-//#ifndef TEST_RUN
-////	ESP.deepSleep(UPDATE_INTERVAL);
-//#endif
-	/*publishBME();
-	publishLux();
-	publishScale();
-	publishAkku(10);
-	delay(600000);
-	for (int i = 1; i < 1024; i++) {
-		//analogWrite(A0, i);
-		//Serial.print(i);
-		//Serial.print("Battery: ");
-		Serial.println(SensorScale1.read_average(10));
-		delay(2000);
-	}*/
+#ifdef TEST_RUN
+    aunit::TestRunner::run();
+#endif
+#ifndef TEST_RUN
+	ESP.deepSleep(UPDATE_INTERVAL); // if loop is reached somehow?
+#endif
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {}
 
-boolean checkAkku(float akku_measure)
-{
-	return ((akku_measure * R_AKKU + O_AKKU) < SHUTDOWN_VOLTAGE);
+inline boolean checkBatteryLevelLow() {
+	return (getBatteryVoltage() < SHUTDOWN_VOLTAGE);
 }
 
+inline bool checkBatteryLevelWarning() {
+    return (getBatteryVoltage() < SHUTDOWN_VOLTAGE + 0.15);
+}
 
-void inline readScale() {
+void inline readScales() {
+    log_d("Begin reading scales...");
 	for (int i = 0; i < NrOfScales; i++) {
-		Scales[i]->main->begin(Scales[i]->dout, Scales[i]->sck);
+		Scales[i]->main->begin(Scales[i]->dOut, Scales[i]->sck);
 		Scales[i]->main->set_gain(Scales[i]->gain);
-		float scale1 = (Scales[i]->main->read_average(3) - Scales[i]->offset) / Scales[i]->scale;
-		snprintf(Scales[i]->cscale, sizeof(Scales[i]->cscale), "%.2f", scale1);
-#ifdef debug
-		Serial.print("Scale Nr ");
-		Serial.print(i+1);
-		Serial.print(": ");
-		Serial.println(scale1);
-#endif
+		scaleValue = (Scales[i]->main->read_average(3) - Scales[i]->offset) / Scales[i]->scale;
+		snprintf(Scales[i]->scaleValueBuffer, sizeof(Scales[i]->scaleValueBuffer), "%.2f", scaleValue);
+        log_d("Scale Nr.: %i; Value: %f", i+1, scaleValue);
 	}
+    digitalWrite(SCALE_SCK, HIGH);	// set scales to sleep
 }
 
 void inline readLux() {
-	float lux_mid = 0;
+    luxValue = 0;
 	if (SensorLux.getError() == 0) {
 		for (int i = 1; i < luxMid; i++) {
-			lux_mid += SensorLux.getLux();
+            luxValue += SensorLux.getLux();
 			delay(5);
 		}
-		lux_mid = lux_mid / luxMid;
-		snprintf(clux, sizeof(clux), "%.1f", lux_mid);
-#ifdef debug
-		Serial.print("Updating Lux: ");
-		Serial.println(lux_mid);
-#endif
+        luxValue = luxValue / luxMid;
+		snprintf(luxBuffer, sizeof(luxBuffer), "%.1f", luxValue);
+        log_d("Updating Lux: %f", luxValue);
 	}
 }
 
 void inline readBME() {
+    log_d("Begin reading BME...");
 	startBME();
 	SensorBme.read(pres, temp, hum, tempUnit, presUnit);
-	//72.4 Humidity / Pressure Exception:
-	char retries = 0;
+	// Pressure Exception:
+	uint8_t retries = 0;
 	while (pres <= 0.65 && retries <= 5) {
 		startBME();
 		SensorBme.read(pres, temp, hum, tempUnit, presUnit);
 		retries++;
 	}
-	snprintf(ctemp, sizeof(ctemp), "%.1f", temp);
-	snprintf(chum, sizeof(chum), "%.1f", hum);
-	snprintf(cpres, sizeof(cpres), "%.4f", pres);
-#ifdef debug
-	Serial.print("Updating bme (T, H, P): ");
-	Serial.print(ctemp);
-	Serial.print(", ");
-	Serial.print(chum);
-	Serial.print(", ");
-	Serial.println(cpres);
-#endif
+	snprintf(tempValueBuffer, sizeof(tempValueBuffer), "%.1f", temp);
+	snprintf(humValueBuffer, sizeof(humValueBuffer), "%.1f", hum);
+	snprintf(presValueBuffer, sizeof(presValueBuffer), "%.4f", pres);
+	log_d("Updating BME: T=%s, H=%s, P=%s", tempValueBuffer, humValueBuffer, presValueBuffer);
 }
 
-void inline startBME()
-{
-	if (!SensorBme.begin()) {
-		SensorBme.begin();
-	}
-}
+void inline startBME() { if (!SensorBme.begin()) SensorBme.begin(); }
 
 void debug_menu()
 {
@@ -273,21 +297,21 @@ void debug_menu()
 void start_ota()
 {
 	ArduinoOTA.onStart([]() {
-		Serial.println("Start");
+		log_d("Starting Arduino OTA");
 	});
 	ArduinoOTA.onEnd([]() {
-		Serial.println("\nEnd");
+        log_d("Ending Arduino OTA");
 	});
 	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-		Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+        log_d("Progress: %u%%\r", (progress / (total / 100)));
 	});
 	ArduinoOTA.onError([](ota_error_t error) {
-		Serial.printf("Error[%u]: ", error);
-		if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-		else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-		else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-		else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-		else if (error == OTA_END_ERROR) Serial.println("End Failed");
+		log_e("ArduinoOta Error[%u]: ", error);
+		if (error == OTA_AUTH_ERROR) log_e("Auth Failed");
+		else if (error == OTA_BEGIN_ERROR) log_e("Begin Failed");
+		else if (error == OTA_CONNECT_ERROR) log_e("Connect Failed");
+		else if (error == OTA_RECEIVE_ERROR) log_e("Receive Failed");
+		else if (error == OTA_END_ERROR) log_e("End Failed");
 	});
 	ArduinoOTA.begin();
 }
@@ -304,7 +328,7 @@ void calibrate_scales() {
 	Serial.println("");
 	Serial.println("Type start or any other command within 10s to begin!");
 	for (int i = 0; i < NrOfScales; i++) {
-		Scales[i]->main->begin(Scales[i]->dout, Scales[i]->sck);
+		Scales[i]->main->begin(Scales[i]->dOut, Scales[i]->sck);
 		Scales[i]->main->set_gain(128);
 		Scales[i]->main->set_scale();
 	}
@@ -363,61 +387,42 @@ void calibrate_scales() {
 	}
 }
 
-///attempt to connect to the wifi if connection is lost
+// attempt to connect to the wifi if connection is lost
 bool reconnect() {
 	if (WiFi.status() != WL_CONNECTED) {
-#ifdef debug
-		Serial.print("Connecting to ");
-		Serial.print(ssid);
-#endif
-		start_time = millis();
+		log_d("Connecting to Wifi Network: %s", bufferWifiSSid);
+	    start_time = millis();
 		current_time = millis();
 		while (WiFi.status() != WL_CONNECTED && start_time + 15*1000 > current_time) {
 			delay(500);
 			current_time = millis();
-#ifdef debug
-			Serial.print(".");
-#endif
 		}
-#ifdef debug
 		if (WiFi.status() == WL_CONNECTED) {
-			Serial.println("");
-			Serial.println("WiFi connected");
-			Serial.print("IP address: ");
-			Serial.println(WiFi.localIP());
+            log_d("Wifi connected. IP Address: %s", WiFi.localIP().toString().c_str());
 		}
-		else
-		{
-			Serial.println("Timed out while connecting to Wifi...");
+		else{
+			log_d("Timed out while connecting to Wifi...");
 		}
-#endif
 	}
-	//make sure we are connected to WIFI before attemping to reconnect to MQTT
+	// make sure we are connected to WIFI before attempting to reconnect to MQTT
 	if (WiFi.status() == WL_CONNECTED) {
 		start_time = millis();
 		current_time = millis();
 		volatile uint8_t retries = 0;
-		while (!client.connected() && (retries <= 3)) {
+		while (!myMqttClient.connected() && (retries <= 3)) {
 			retries++;
-			Serial.print("Attempting MQTT connection...");
-			String clientId = MQTT_CLIENT_ID;  // Set Client ID
+			log_d("Attempting MQTT connection: User: %s, Password: %s", bufferMqttUser, bufferMqttPass);
 			// Attempt to connect to MQTT Server
-			if (client.connect(clientId.c_str(), mqttUser, mqttPassword)) {
-#ifdef debug
-				Serial.println("connected");
-#endif
+			if (myMqttClient.connect(bufferMqttName, bufferMqttUser, bufferMqttPass)) {
+			    log_d("Connected to Mqtt Server.");
 			}
 			else {
-#ifdef debug
-				Serial.print("failed, rc=");
-				Serial.print(client.state());
-				Serial.println(" trying again in 1 seconds");
-#endif
+			    log_d("Failed to connect to Mqtt Server; State: %i; trying again in 1s...", myMqttClient.state());
 				delay(1000);  // Wait 1 seconds before retrying
 			}
 		}
 	}
-	if ((WiFi.status() == WL_CONNECTED) && client.connected()) {
+	if ((WiFi.status() == WL_CONNECTED) && myMqttClient.connected()) {
 		return true;
 	}
 	else {

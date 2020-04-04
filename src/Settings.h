@@ -27,8 +27,8 @@
 #define MQTT_PASS	SECRET_MQTT_PASS
 
 //Topics for MQTT:
-#define MQTT_CLIENT_ID			"EspBalkon"
-#define MQTT_TOPIC_AKKU			"/home/balkon/akku/"
+//#define MQTT_CLIENT_ID			"EspBalkon"
+#define MQTT_TOPIC_AKKU			"/home/balkon/batteryLevel/"
 #define MQTT_TOPIC_AKKU_LOW		"/home/balkon/akkulow/"
 #define MQTT_TOPIC_LUX			"/home/balkon/lux/"
 #define MQTT_TOPIC_TEMPERATURE	"/home/balkon/temp/"

@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+
+
 template<typename T>
 struct EepParameter {
     T value;
@@ -23,12 +25,31 @@ typedef struct {
     EepParameter<uint16_t> MqttPort;
     EepParameter<String> MqttUser;
     EepParameter<String> MqttPass;
+    EepParameter<String> MqttName;
     EepParameter<uint8_t> UpdateInterval;
 } EepStructNetwork;
+
+typedef struct {
+    EepParameter<String> MqttUri;
+    EepParameter<String> MqttUriLow;
+} EepStructBattery;
+
+typedef struct {
+    EepParameter<String> MqttUriTemp;
+    EepParameter<String> MqttUriHum;
+    EepParameter<String> MqttUriPres;
+} EepStructBme;
+
+typedef struct {
+    EepParameter<String> MqttUri;
+} EepStructLux;
 
 namespace Settings {
 
     extern EepStructNetwork settingsNetwork;
+    extern EepStructBattery settingsBattery;
+    extern EepStructLux settingsLux;
+    extern EepStructBme settingsBme;
     extern EepStructScale settingsScale1;
     extern EepStructScale settingsScale2;
     extern EepStructScale settingsScale3;
@@ -52,6 +73,9 @@ public:
     void getConfigScales(EepStructScale &scaleSettings);
     void getConfigNetwork(EepStructNetwork &networkSettings);
     void getConfigNetwork();
+    void getConfigBattery();
+    void getConfigLux();
+    void getConfigBme();
     void updateConfigScalesAll();
     void updateConfigScales(EepStructScale &eepStructScale);
     void updateConfigNetwork();

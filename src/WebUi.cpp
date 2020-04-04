@@ -12,6 +12,9 @@ static bool ui_setup_finished = false;
 
 struct tabsStruct {
     uint16_t tabNetwork;
+    uint16_t tabBatteryLevel;
+    uint16_t tabBME;
+    uint16_t tabLux;
     uint16_t tabScale1;
     uint16_t tabScale2;
     uint16_t tabScale3;
@@ -30,6 +33,9 @@ typedef struct {
 } UiWithListConnection;
 
 ListUiElementWithSettings tabNetwork = ListUiElementWithSettings();
+ListUiElementWithSettings tabBattery = ListUiElementWithSettings();
+ListUiElementWithSettings tabBme = ListUiElementWithSettings();
+ListUiElementWithSettings tabLux = ListUiElementWithSettings();
 ListUiElementWithSettings tabScale1 = ListUiElementWithSettings();
 ListUiElementWithSettings tabScale2 = ListUiElementWithSettings();
 ListUiElementWithSettings tabScale3 = ListUiElementWithSettings();
@@ -41,6 +47,9 @@ ListUiElementWithSettings tabScale8 = ListUiElementWithSettings();
 ListUiElementWithSettings tabScale9 = ListUiElementWithSettings();
 ListUiElementWithSettings tabScale10 = ListUiElementWithSettings();
 UiWithListConnection uiWithListConnection[] { {&tabNetwork, &tabs.tabNetwork},
+                                              {&tabBattery, &tabs.tabBatteryLevel},
+                                              {&tabBme, &tabs.tabBME},
+                                              {&tabLux, &tabs.tabLux},
                                               {&tabScale1, &tabs.tabScale1},
                                               {&tabScale2, &tabs.tabScale2},
                                               {&tabScale3, &tabs.tabScale3},
@@ -65,9 +74,25 @@ struct networkTabStruct {
     uint16_t textMqttPort;
     uint16_t textMqttUser;
     uint16_t textMqttPass;
+    uint16_t textMqttName;
     uint16_t sliderUpdate;
     uint16_t buttonSave;
 } networkTab;
+
+struct batteryTabStruct {
+    uint16_t batteryMqttUri;
+    uint16_t batteryMqttUriLow;
+} batteryTab;
+
+struct bmeTabStruct {
+    uint16_t tempMqttUri;
+    uint16_t humMqttUri;
+    uint16_t presMqttUri;
+} bmeTab;
+
+struct luxTabStruct {
+    uint16_t luxMqttUri;
+} luxTab;
 
 ScalesTab scalesTab1;
 ScalesTab scalesTab2;
@@ -85,13 +110,10 @@ uint16_t millisLabelId;
 uint16_t switchOne;
 
 void saveTab(ListUiElementWithSettings &tab) {
-    Serial.println(ESPUI.getControl(17)->value);
-    Serial.println(ESPUI.getControl(17)->label);
-    Serial.print("Saving Tab: ");
     auto *element = (UiElementWithSettingsBase*)tab.getIterator();
     while (element != nullptr) {
         // save:
-        log_i("Setting parameter: %s, element: %i", ESPUI.getControl(element->getUiElement())->value, element->getUiElement());
+        log_d("Setting parameter: %s, element: %s", ESPUI.getControl(element->getUiElement())->value.c_str(), ESPUI.getControl(element->getUiElement())->label);
         element->setEepParameter(ESPUI.getControl(element->getUiElement())->value);
         element->saveEepParameter(settingsManager);
 
@@ -100,10 +122,6 @@ void saveTab(ListUiElementWithSettings &tab) {
 }
 
 void updateValue(Control *sender, int type) {
-//    Serial.print("Text: ID: ");
-//    Serial.print(sender->id);
-//    Serial.print(", Value: ");
-//    Serial.println(sender->value);
 }
 
 void loadTab(ListUiElementWithSettings &tab) {
@@ -111,7 +129,7 @@ void loadTab(ListUiElementWithSettings &tab) {
     while (element != nullptr) {
         // load:
         element->loadEepParameter(settingsManager);
-        if (!(strcmp(ESPUI.getControl(element->getUiElement())->label, "MQTT Uri") == 0 && element->getEepValue() == 0))  // if not mqtt scale input
+        if (!(ESPUI.getControl(element->getUiElement())->value && element->getEepValue() == 0))  // if not value is empty, String(ESPUI.getControl(element->getUiElement())->label).indexOf("Uri") > 0
             ESPUI.getControl(element->getUiElement())->value = element->getEepValue();
         ESPUI.updateControl(element->getUiElement());
 
@@ -125,19 +143,29 @@ void saveAndQuit(Control *sender, int type) {
         ESPUI.updateControl(status_log);
         return;
     }
-    ESPUI.getControl(status_log)->value = "Saving values and rebooting...";
+    ESPUI.getControl(status_log)->value = "Saving values and rebooting... \nYou may close this tab now.";
     ESPUI.updateControl(status_log);
+    saveTab(tabNetwork);
+    saveTab(tabBattery);
+    saveTab(tabBme);
+    saveTab(tabLux);
+    saveTab(tabScale1);
+    saveTab(tabScale2);
+    saveTab(tabScale3);
+    saveTab(tabScale4);
+    saveTab(tabScale5);
+    saveTab(tabScale6);
+    saveTab(tabScale7);
+    saveTab(tabScale8);
+    saveTab(tabScale9);
+    saveTab(tabScale10);
     ui_setup_finished = true;
 }
 
 void saveTabCallback(Control *sender, int type) {
-    Serial.println(ESPUI.getControl(sender->id)->parentControl);
     for (auto list : uiWithListConnection) {
-        Serial.println(*list.tabId);
         if (ESPUI.getControl(sender->id)->parentControl == *list.tabId) {
             saveTab(*list.listUiElementWithSettings);
-            Serial.println("Saving in list");
-            Serial.println(ESPUI.getControl(*list.tabId)->label);
             return;
         }
     }
@@ -204,8 +232,6 @@ void switchScaleElements(ScalesTab &scalesTab, String value) {
 
 void setup_espui(SettingsManager& newSettingsManager) {
     settingsManager = newSettingsManager;
-    Serial.println(2);
-    Serial.println(settingsManager.firstStartUp());
     ESPUI.setVerbosity(ESPUI_Verbosity::Quiet);
 
 
@@ -213,12 +239,11 @@ void setup_espui(SettingsManager& newSettingsManager) {
 
     // try to connect to existing network
     WiFi.begin(ESPUI_ssid, ESPUI_password);
-//    Serial.print("\n\nTry to connect to existing network");
 
     uint8_t timeout = 10;
-    // create hotspot
+    // create hot spot
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.print("\n\nCreating hotspot");
+        log_d("\n\nCreating Hot Spot");
 
         WiFi.mode(WIFI_AP);
         WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
@@ -228,27 +253,26 @@ void setup_espui(SettingsManager& newSettingsManager) {
 
         do {
             delay(500);
-            Serial.print(".");
+            log_d(".");
             timeout--;
         } while (timeout);
     }
 
     dnsServer.start(DNS_PORT, "*", apIP);
 
-    Serial.println("\n\nWiFi parameters:");
-    Serial.print("Mode: ");
-    Serial.println(WiFi.getMode() == WIFI_AP ? "Station" : "Client");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP());
+    log_d("WiFi parameters; Mode: %s; IP Address: %s", WiFi.getMode() == WIFI_AP ? "Station" : "Client", WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP());
 
-    updateAkku();
-    status_akku = ESPUI.addControl(ControlType::Label, "Battery Level:", cakku, ControlColor::Sunflower);
-    button_save = ESPUI.addControl(ControlType::Button, "Save and Reboot", "Save", ControlColor::Emerald, Control::noParent, &saveAndQuit);
+    updateBatteryLevel();
+    status_akku = ESPUI.addControl(ControlType::Label, "Battery Level:", batteryLevelBuffer, ControlColor::Sunflower);
     status_log = ESPUI.addControl(ControlType::Label, "Status Message", "Please enter your data", ControlColor::Sunflower);
+    button_save = ESPUI.addControl(ControlType::Button, "Save and Reboot", "Save", ControlColor::Emerald, Control::noParent, &saveAndQuit);
 
 
     setupTabs();
     setupNetworkTab(tabs.tabNetwork);
+    setupBatteryTab(tabs.tabBatteryLevel);
+    setupBMETab(tabs.tabBME);
+    setupLuxTab(tabs.tabLux);
     setupScalesTab(tabs.tabScale1, scalesTab1, tabScale1, Settings::settingsScale1, "1");
     setupScalesTab(tabs.tabScale2, scalesTab2, tabScale2, Settings::settingsScale2, "2");
     setupScalesTab(tabs.tabScale3, scalesTab3, tabScale3, Settings::settingsScale3, "3");
@@ -268,13 +292,16 @@ void setup_espui(SettingsManager& newSettingsManager) {
     loop_espui();
 }
 
-void updateAkku() {
-    readAkku(5); // TODO
-    ESPUI.updateControlValue(status_akku, cakku);
+void updateBatteryLevel() {
+    readBatteryLevel(5);
+    ESPUI.updateControlValue(status_akku, (String)getBatteryLevel() + "%");
 }
 
 void setupTabs() {
     tabs.tabNetwork = ESPUI.addControl( ControlType::Tab, "Network", "Network", ControlColor::Alizarin, Control::noParent, &switchTab);
+    tabs.tabBatteryLevel = ESPUI.addControl( ControlType::Tab, "Battery", "Battery", ControlColor::Alizarin, Control::noParent, &switchTab);
+    tabs.tabBME = ESPUI.addControl( ControlType::Tab, "Environment Sensor", "Environment Sensor", ControlColor::Alizarin, Control::noParent, &switchTab);
+    tabs.tabLux = ESPUI.addControl( ControlType::Tab, "Light Sensor", "Light Sensor", ControlColor::Alizarin, Control::noParent, &switchTab);
     tabs.tabScale1 = ESPUI.addControl( ControlType::Tab, "Scale 1", "Scale 1", ControlColor::Alizarin,  Control::noParent, &switchTab);
     tabs.tabScale2 = ESPUI.addControl( ControlType::Tab, "Scale 2", "Scale 2", ControlColor::Alizarin,  Control::noParent, &switchTab);
     tabs.tabScale3 = ESPUI.addControl( ControlType::Tab, "Scale 3", "Scale 3", ControlColor::Alizarin,  Control::noParent, &switchTab);
@@ -300,6 +327,8 @@ void setupNetworkTab(uint16_t parentTab) {
     tabNetwork.addElement<String>(networkTab.textMqttUser, &Settings::settingsNetwork.MqttUser);
     networkTab.textMqttPass = ESPUI.addControl(ControlType::Text, "MQTT Password", "", ControlColor::Peterriver, parentTab, &updateValue);
     tabNetwork.addElement<String>(networkTab.textMqttPass, &Settings::settingsNetwork.MqttPass);
+    networkTab.textMqttName = ESPUI.addControl(ControlType::Text, "MQTT Client Name", "", ControlColor::Peterriver, parentTab, &updateValue);
+    tabNetwork.addElement<String>(networkTab.textMqttName, &Settings::settingsNetwork.MqttName);
     networkTab.sliderUpdate = ESPUI.addControl(ControlType::Slider, "Update Interval in Minutes (Smaller Values = more Power Consumption)", "10", ControlColor::Peterriver, parentTab, &updateValue);
     tabNetwork.addElement<uint8_t>(networkTab.sliderUpdate, &Settings::settingsNetwork.UpdateInterval);
     networkTab.buttonSave = ESPUI.addControl(ControlType::Button, "Save", "Save",ControlColor::Wetasphalt, parentTab, &saveTabCallback);
@@ -318,8 +347,6 @@ void setupScalesTab(uint16_t parentTab, ScalesTab &scalesTab, ListUiElementWithS
     scalesTab.labelCalibrate = ESPUI.addControl(ControlType::Label, "Scaling Value", "", ControlColor::Emerald, parentTab);
     tabScale.addElement<float>(scalesTab.labelCalibrate, &eepStructScale.ScaleScale);
     scalesTab.buttonSave = ESPUI.addControl(ControlType::Button, "Save Scale Settings", "Save", ControlColor::Wetasphalt, parentTab, &saveTabCallback);
-    Serial.print("Added Button:::::::");
-    Serial.println(scalesTab.buttonSave);
 }
 
 void loop_espui() {
@@ -341,11 +368,34 @@ void loop_espui() {
 
         if (millis() - oldTime > 1000) {
             //ESPUI.updateControlValue(millisLabelId, String(millis()));
-            //ESPUI.updateControlValue(status, String(akku));
+            //ESPUI.updateControlValue(status, String(batteryLevel));
             //ESPUI.updateControlValue(switchOne, testSwitchState ? "1" : "0");
-            updateAkku();
+            updateBatteryLevel();
 
             oldTime = millis();
         }
     }
+    ESP.restart();
+    delay(10000);
+}
+
+void setupBatteryTab(uint16_t parentTab) {
+    batteryTab.batteryMqttUri = ESPUI.addControl(ControlType::Text, "MQTT Battery Uri", "/home/balkon/batteryLevel/", ControlColor::Peterriver, parentTab, &updateValue);
+    tabBattery.addElement<String>(batteryTab.batteryMqttUri, &Settings::settingsBattery.MqttUri);
+    batteryTab.batteryMqttUriLow = ESPUI.addControl(ControlType::Text, "MQTT Battery Uri Warning", "/home/balkon/batteryLow/", ControlColor::Peterriver, parentTab, &updateValue);
+    tabBattery.addElement<String>(batteryTab.batteryMqttUriLow, &Settings::settingsBattery.MqttUriLow);
+}
+
+void setupBMETab(uint16_t parentTab) {
+    bmeTab.tempMqttUri = ESPUI.addControl(ControlType::Text, "MQTT Temperature Uri", "/home/balkon/temp/", ControlColor::Peterriver, parentTab, &updateValue);
+    tabBme.addElement<String>(bmeTab.tempMqttUri, &Settings::settingsBme.MqttUriTemp);
+    bmeTab.tempMqttUri = ESPUI.addControl(ControlType::Text, "MQTT Humidity Uri", "/home/balkon/hum/", ControlColor::Peterriver, parentTab, &updateValue);
+    tabBme.addElement<String>(bmeTab.humMqttUri, &Settings::settingsBme.MqttUriHum);
+    bmeTab.tempMqttUri = ESPUI.addControl(ControlType::Text, "MQTT Pressure Uri", "/home/balkon/pres/", ControlColor::Peterriver, parentTab, &updateValue);
+    tabBme.addElement<String>(bmeTab.presMqttUri, &Settings::settingsBme.MqttUriPres);
+}
+
+void setupLuxTab(uint16_t parentTab) {
+    luxTab.luxMqttUri = ESPUI.addControl(ControlType::Text, "MQTT Light Level Uri", "/home/balkon/lux/", ControlColor::Peterriver, parentTab, &updateValue);
+    tabLux.addElement<String>(luxTab.luxMqttUri, &Settings::settingsLux.MqttUri);
 }
