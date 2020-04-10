@@ -34,7 +34,6 @@
 #define MQTT_TOPIC_TEMPERATURE	"/home/balkon/temp/"
 #define MQTT_TOPIC_HUMIDITY		"/home/balkon/hum/"
 #define MQTT_TOPIC_PRESSURE		"/home/balkon/pres/"
-#define NrOfScales 2			//Number of used plants (2 per scale sensor!) 
 #define MQTT_TOPIC_PLANT1		"/home/balkon/pflanze1/" //Scale sensor 1, Pins A+ A-
 #define MQTT_TOPIC_PLANT2		"/home/balkon/pflanze2/" //Scale sensor 1, Pins B+ B-
 #define MQTT_TOPIC_PLANT3		"/home/balkon/pflanze3/" //Scale sensor 2, Pins A+ A-

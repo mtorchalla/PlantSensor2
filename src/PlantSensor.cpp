@@ -34,7 +34,7 @@
 float batteryLevel = 0;
 char batteryLevelBuffer[16] {};
 float luxValue = 0;
-float scaleValue;
+double scaleValue;
 
 RTC_DATA_ATTR static char bufferWifiSSid[32] = "";
 RTC_DATA_ATTR static char bufferWifiPass[64] = "";
@@ -64,24 +64,24 @@ uint16_t start_time = millis();
 uint16_t volatile current_time = millis();
 IPAddress mqttServerAddress;
 
-void setupScales_(EepStructScale &eepStructScale, Scale &scale) {
-    scale.scale = eepStructScale.ScaleScale.value;
-    scale.offset = eepStructScale.ScaleOffset.value;
-    scale.mqttUri = eepStructScale.ScaleMqttUri.value.c_str();
-}
-
-void setupScales() {
-    setupScales_(Settings::settingsScale1, Scale1);
-    setupScales_(Settings::settingsScale2, Scale2);
-    setupScales_(Settings::settingsScale3, Scale3);
-    setupScales_(Settings::settingsScale4, Scale4);
-    setupScales_(Settings::settingsScale5, Scale5);
-    setupScales_(Settings::settingsScale6, Scale6);
-    setupScales_(Settings::settingsScale7, Scale7);
-    setupScales_(Settings::settingsScale8, Scale8);
-    setupScales_(Settings::settingsScale9, Scale9);
-    setupScales_(Settings::settingsScale10, Scale10);
-}
+//void setupScales_(EepStructScale &eepStructScale, Scale &scale) {
+//    scale.scale = eepStructScale.ScaleScale.value;
+//    scale.offset = eepStructScale.ScaleOffset.value;
+//    scale.mqttUri = eepStructScale.ScaleMqttUri.value.c_str();
+//}
+//
+//void setupScales() {
+//    setupScales_(Settings::settingsScale1, Scale1);
+//    setupScales_(Settings::settingsScale2, Scale2);
+//    setupScales_(Settings::settingsScale3, Scale3);
+//    setupScales_(Settings::settingsScale4, Scale4);
+//    setupScales_(Settings::settingsScale5, Scale5);
+//    setupScales_(Settings::settingsScale6, Scale6);
+//    setupScales_(Settings::settingsScale7, Scale7);
+//    setupScales_(Settings::settingsScale8, Scale8);
+//    setupScales_(Settings::settingsScale9, Scale9);
+//    setupScales_(Settings::settingsScale10, Scale10);
+//}
 
 void setup() {
     pinMode(GPIO_Battery_READ, INPUT);
@@ -130,7 +130,7 @@ void setup() {
 //        strcpy(bufferMqttUriScale9, Settings::settingsScale9.ScaleMqttUri.value.c_str());
 //        strcpy(bufferMqttUriScale10, Settings::settingsScale10.ScaleMqttUri.value.c_str());
         settingsManager.getConfigScalesAll();
-        setupScales();
+//        setupScales();
         firstStart = false;
     }
     log_d("Starting normal routine");
@@ -155,6 +155,7 @@ void setup() {
 	//delay(3000);
 
     readBatteryLevel(8);
+    Wire.begin();
 	readLux();
 //    readScales();
 	readBME();
@@ -176,8 +177,8 @@ void setup() {
 		//TODO Add Timeout 
         myMqttClient.publish(bufferMqttUriBattery, batteryLevelBuffer);
         myMqttClient.publish(bufferMqttUriBatteryLow, "0");
-		for (int i = 0; i < NrOfScales; i++) {
-            myMqttClient.publish(Scales[i]->mqttUri, Scales[i]->scaleValueBuffer);
+		for (int i = 0; i < NR_OF_SCALES; i++) {
+            myMqttClient.publish(Scales[i]->settings->ScaleMqttUri.value.c_str(), Scales[i]->scaleValueBuffer);
 			log_d("Publishing Scale Value: %s", Scales[i]->scaleValueBuffer);
 		}
         myMqttClient.publish(bufferMqttUriLux, luxBuffer);
@@ -240,18 +241,6 @@ inline bool checkBatteryLevelWarning() {
     return (getBatteryVoltage() < SHUTDOWN_VOLTAGE + 0.15);
 }
 
-void inline readScales() {
-    log_d("Begin reading scales...");
-	for (int i = 0; i < NrOfScales; i++) {
-		Scales[i]->main->begin(Scales[i]->dOut, Scales[i]->sck);
-		Scales[i]->main->set_gain(Scales[i]->gain);
-		scaleValue = (Scales[i]->main->read_average(3) - Scales[i]->offset) / Scales[i]->scale;
-		snprintf(Scales[i]->scaleValueBuffer, sizeof(Scales[i]->scaleValueBuffer), "%.2f", scaleValue);
-        log_d("Scale Nr.: %i; Value: %f", i+1, scaleValue);
-	}
-    digitalWrite(SCALE_SCK, HIGH);	// set scales to sleep
-}
-
 void inline readLux() {
     luxValue = 0;
 	if (SensorLux.getError() == 0) {
@@ -282,7 +271,9 @@ void inline readBME() {
 	log_d("Updating BME: T=%s, H=%s, P=%s", tempValueBuffer, humValueBuffer, presValueBuffer);
 }
 
-void inline startBME() { if (!SensorBme.begin()) SensorBme.begin(); }
+void inline startBME() {
+    if (!SensorBme.begin()) SensorBme.begin();
+}
 
 void debug_menu()
 {
@@ -327,7 +318,7 @@ void calibrate_scales() {
 	Serial.println("stop");
 	Serial.println("");
 	Serial.println("Type start or any other command within 10s to begin!");
-	for (int i = 0; i < NrOfScales; i++) {
+	for (int i = 0; i < NR_OF_SCALES; i++) {
 		Scales[i]->main->begin(Scales[i]->dOut, Scales[i]->sck);
 		Scales[i]->main->set_gain(128);
 		Scales[i]->main->set_scale();

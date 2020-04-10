@@ -11,7 +11,6 @@ void setupScales_();
 void readBatteryLevel(int repeatMeasurement);
 void readLux();
 void setupScales();
-void readScales();
 void readBME();
 bool reconnect();
 void debug_menu();

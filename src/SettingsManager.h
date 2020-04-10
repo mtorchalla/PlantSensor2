@@ -3,20 +3,9 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include "ConfigScale.h"
+#include "EepParameterTypes.h"
 
-
-template<typename T>
-struct EepParameter {
-    T value;
-    const char *eepName;
-};
-
-typedef struct {
-    EepParameter<float> ScaleOffset;
-    EepParameter<float> ScaleScale;
-    EepParameter<String> ScaleMqttUri;
-    EepParameter<bool> ScaleInUse;
-} EepStructScale;
 
 typedef struct {
     EepParameter<String> WifiSSid;
@@ -44,12 +33,60 @@ typedef struct {
     EepParameter<String> MqttUri;
 } EepStructLux;
 
+typedef struct {
+    EepParameter<bool> useValve1;
+    EepParameter<bool> useValve2;
+    EepParameter<bool> useValve3;
+    EepParameter<bool> useValve4;
+    EepParameter<bool> useValve5;
+    EepParameter<bool> useValve6;
+    EepParameter<bool> useValve7;
+    EepParameter<bool> useValve8;
+    EepParameter<bool> useValve9;
+    EepParameter<bool> useValve10;
+    EepParameter<float> voltageValve1;
+    EepParameter<float> voltageValve2;
+    EepParameter<float> voltageValve3;
+    EepParameter<float> voltageValve4;
+    EepParameter<float> voltageValve5;
+    EepParameter<float> voltageValve6;
+    EepParameter<float> voltageValve7;
+    EepParameter<float> voltageValve8;
+    EepParameter<float> voltageValve9;
+    EepParameter<float> voltageValve10;
+    EepParameter<uint8_t> selectScale1;
+    EepParameter<uint8_t> selectScale2;
+    EepParameter<uint8_t> selectScale3;
+    EepParameter<uint8_t> selectScale4;
+    EepParameter<uint8_t> selectScale5;
+    EepParameter<uint8_t> selectScale6;
+    EepParameter<uint8_t> selectScale7;
+    EepParameter<uint8_t> selectScale8;
+    EepParameter<uint8_t> selectScale9;
+    EepParameter<uint8_t> selectScale10;
+    EepParameter<String> mqttUriValve1;
+    EepParameter<String> mqttUriValve2;
+    EepParameter<String> mqttUriValve3;
+    EepParameter<String> mqttUriValve4;
+    EepParameter<String> mqttUriValve5;
+    EepParameter<String> mqttUriValve6;
+    EepParameter<String> mqttUriValve7;
+    EepParameter<String> mqttUriValve8;
+    EepParameter<String> mqttUriValve9;
+    EepParameter<String> mqttUriValve10;
+    EepParameter<bool> *useValveList[NR_OF_SCALES];
+    EepParameter<float> *voltageValveList[NR_OF_SCALES];
+    EepParameter<uint8_t> *selectScaleList[NR_OF_SCALES];
+    EepParameter<String> *mqttUriList[NR_OF_SCALES];
+} EepStructValves;
+
 namespace Settings {
 
     extern EepStructNetwork settingsNetwork;
     extern EepStructBattery settingsBattery;
     extern EepStructLux settingsLux;
     extern EepStructBme settingsBme;
+    extern EepStructValves settingsValves;
     extern EepStructScale settingsScale1;
     extern EepStructScale settingsScale2;
     extern EepStructScale settingsScale3;
@@ -76,6 +113,7 @@ public:
     void getConfigBattery();
     void getConfigLux();
     void getConfigBme();
+    void getConfigValves();
     void updateConfigScalesAll();
     void updateConfigScales(EepStructScale &eepStructScale);
     void updateConfigNetwork();

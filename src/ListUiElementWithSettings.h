@@ -16,7 +16,7 @@ struct is_same
 
 //class UiElementWithSettingsBase;
 template<class T> class SettSettingsManager;
-
+typedef struct { } BaseUiElements;
 
 class UiElementWithSettingsBase {
     nullptr_t eepParameter;
@@ -66,6 +66,9 @@ public:
     String getEepValue() {
         return String(this->eepParameter->value);
     }
+    EepParameter<T> *getEepParameter() {
+        return this->eepParameter;
+    }
     void setEepParameter(String value) {
 //        Serial.print("Setting Parameter: ");
 //        Serial.println(value);
@@ -79,6 +82,8 @@ public:
     void loadEepParameter(SettingsManager &settingsManager) {
         this->eepParameter->value = settingsManager.loadValue(*(this->eepParameter));
     }
+
+
 };
 
 template<> inline void UiElementWithSettings<String>::_saveEepParameter(EepParameter<String> *param, String value) {
@@ -100,7 +105,10 @@ template<> inline void UiElementWithSettings<float>::_saveEepParameter(EepParame
 class ListUiElementWithSettings {
 public:
 
-    ListUiElementWithSettings() { this->elements = nullptr; };
+    ListUiElementWithSettings(BaseUiElements *baseUiElements) {
+        this->elements = nullptr;
+        this->uiElements = baseUiElements;
+    };
 
     UiElementWithSettingsBase *getIterator() {
         return this->elements;
@@ -135,9 +143,26 @@ public:
         }
     }
 
+    template <typename T>
+    EepParameter<T> *getEepParameterFromControl(uint16_t controlId) {
+        auto *element = (UiElementWithSettingsBase*)this->getIterator();
+        log_d("Got iterator: %s", element->getEepName().c_str());
+        while (element != nullptr) {
+            if (element->getUiElement() == controlId) {
+                auto e = (UiElementWithSettings<T> *) (element);
+                log_d("Got Parameter: %s", e->getEepName().c_str());
+                return e->getEepParameter();
+            }
+
+            element = element->next;
+        }
+        return nullptr;
+    }
+
+    uint16_t parentTab;
+    BaseUiElements *uiElements;
 private:
     UiElementWithSettingsBase *elements;
-
 };
 
 //template<typename T>
