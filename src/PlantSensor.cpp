@@ -275,8 +275,8 @@ void startCloudUpdate() {
     const char* fingerprint = "cc aa 48 48 66 46 0e 91 53 2c 9c 7c 23 2a b1 74 4d 29 9d 33";
 
     const char* host = "raw.githubusercontent.com";
-    const char* urlBin = "/mtorchalla/PlantSensor/master/PlantSensor/Release/PlantSensor.ino.bin";
-    const char* urlFW = "/mtorchalla/PlantSensor/master/PlantSensor/FWVersion.h";
+    const char* urlBin = "/mtorchalla/PlantSensor2/master/PlantSensor/Release/PlantSensor.ino.bin";
+    const char* urlFW = "/mtorchalla/PlantSensor2/master/PlantSensor/FWVersion.h";
     const char* fw_url_bin = "https://raw.githubusercontent.com/mtorchalla/PlantSensor/master/PlantSensor/Release/PlantSensor.ino.bin";
     const char* fw_url_ver = "https://raw.githubusercontent.com/mtorchalla/PlantSensor/master/PlantSensor/Version.h";
 
