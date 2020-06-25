@@ -58,10 +58,14 @@ struct bmeTabStruct : BaseUiElements {
     uint16_t tempMqttUri;
     uint16_t humMqttUri;
     uint16_t presMqttUri;
+    uint16_t labelTemp;
+    uint16_t labelHum;
+    uint16_t labelPres;
 } bmeTab;
 
 struct luxTabStruct : BaseUiElements {
     uint16_t luxMqttUri;
+    uint16_t labelLux;
 } luxTab;
 
 struct valveTabStruct : BaseUiElements {
@@ -494,6 +498,20 @@ void updateBatteryLevel() {
     ESPUI.updateControlValue(status_akku, (String)getBatteryLevel() + "%");
 }
 
+void updateBmeValues() {
+    log_d("Updating Bme Values");
+    readBME();
+    ESPUI.updateControlValue(bmeTab.labelTemp, (String)tempValueBuffer + " °C");
+    ESPUI.updateControlValue(bmeTab.labelHum, (String)humValueBuffer + " %r");
+    ESPUI.updateControlValue(bmeTab.labelPres, (String)presValueBuffer + " bar");
+}
+
+void updateLuxValues() {
+    log_d("Updating Lux Values");
+    readLux();
+    ESPUI.updateControlValue(luxTab.labelLux, (String)luxValueBuffer + " lx");
+}
+
 void setupTabs() {
     tabNetwork.parentTab = ESPUI.addControl( ControlType::Tab, "Network", "Network", ControlColor::Alizarin, Control::noParent, &switchTab);
     tabBattery.parentTab = ESPUI.addControl( ControlType::Tab, "Battery", "Battery", ControlColor::Alizarin, Control::noParent, &switchTab);
@@ -597,8 +615,11 @@ void loop_espui() {
         if (millis() - oldTime > UPDATE_INTERVAL_WEB_UI) {
             updateBatteryLevel();
             updateScaleValues();
+            updateBmeValues();
+            updateLuxValues();
             oldTime = millis();
         }
+
     }
     ESP.restart();
     delay(10000);
@@ -618,11 +639,15 @@ void setupBMETab(uint16_t parentTab) {
     tabBme.addElement<String>(bmeTab.humMqttUri, &Settings::settingsBme.MqttUriHum);
     bmeTab.presMqttUri = ESPUI.addControl(ControlType::Text, "MQTT Pressure Uri", "/home/smart_garden/pres/", ControlColor::Peterriver, parentTab, &updateValue);
     tabBme.addElement<String>(bmeTab.presMqttUri, &Settings::settingsBme.MqttUriPres);
+    bmeTab.labelTemp = ESPUI.addControl(ControlType::Label, "Current Temperature in °C", "", ControlColor::Peterriver, parentTab);
+    bmeTab.labelHum  = ESPUI.addControl(ControlType::Label, "Current Humidity in %r", "", ControlColor::Peterriver, parentTab);
+    bmeTab.labelPres = ESPUI.addControl(ControlType::Label, "Current Pressure in bar", "", ControlColor::Peterriver, parentTab);
 }
 
 void setupLuxTab(uint16_t parentTab) {
     luxTab.luxMqttUri = ESPUI.addControl(ControlType::Text, "MQTT Light Level Uri", "/home/smart_garden/lux/", ControlColor::Peterriver, parentTab, &updateValue);
     tabLux.addElement<String>(luxTab.luxMqttUri, &Settings::settingsLux.MqttUri);
+    luxTab.labelLux = ESPUI.addControl(ControlType::Label, "Current Light Level in lx", "", ControlColor::Peterriver, parentTab);
 }
 
 void selectScale(Control *sender, int type) {
@@ -635,7 +660,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve1, &Settings::settingsValves.useValve1);
     valveTab.voltageValve1 = ESPUI.addControl(ControlType::Text, "Output 1 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve1, &Settings::settingsValves.voltageValve1);
-    valveTab.selectScale1 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale1 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 1", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale1, &Settings::settingsValves.selectScale1);
     valveTab.mqttUriValve1 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 1:", "/home/smart_garden/actuator1", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve1, &Settings::settingsValves.mqttUriValve1);
@@ -644,7 +669,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve2, &Settings::settingsValves.useValve2);
     valveTab.voltageValve2 = ESPUI.addControl(ControlType::Text, "Output 2 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve2, &Settings::settingsValves.voltageValve2);
-    valveTab.selectScale2 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale2 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 2", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale2, &Settings::settingsValves.selectScale2);
     valveTab.mqttUriValve2 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 2:", "/home/smart_garden/actuator2", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve2, &Settings::settingsValves.mqttUriValve2);
@@ -653,7 +678,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve3, &Settings::settingsValves.useValve3);
     valveTab.voltageValve3 = ESPUI.addControl(ControlType::Text, "Output 3 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve3, &Settings::settingsValves.voltageValve3);
-    valveTab.selectScale3 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale3 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 3", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale3, &Settings::settingsValves.selectScale3);
     valveTab.mqttUriValve3 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 3:", "/home/smart_garden/actuator3", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve3, &Settings::settingsValves.mqttUriValve3);
@@ -662,7 +687,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve4, &Settings::settingsValves.useValve4);
     valveTab.voltageValve4 = ESPUI.addControl(ControlType::Text, "Output 4 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve4, &Settings::settingsValves.voltageValve4);
-    valveTab.selectScale4 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale4 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 4", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale4, &Settings::settingsValves.selectScale4);
     valveTab.mqttUriValve4 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 4:", "/home/smart_garden/actuator4", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve4, &Settings::settingsValves.mqttUriValve4);
@@ -671,7 +696,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve5, &Settings::settingsValves.useValve5);
     valveTab.voltageValve5 = ESPUI.addControl(ControlType::Text, "Output 5 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve5, &Settings::settingsValves.voltageValve5);
-    valveTab.selectScale5 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale5 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 5", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale5, &Settings::settingsValves.selectScale5);
     valveTab.mqttUriValve5 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 5:", "/home/smart_garden/actuator5", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve5, &Settings::settingsValves.mqttUriValve5);
@@ -680,7 +705,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve6, &Settings::settingsValves.useValve6);
     valveTab.voltageValve6 = ESPUI.addControl(ControlType::Text, "Output 6 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve6, &Settings::settingsValves.voltageValve6);
-    valveTab.selectScale6 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale6 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 6", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale6, &Settings::settingsValves.selectScale6);
     valveTab.mqttUriValve6 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 6:", "/home/smart_garden/actuator6", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve6, &Settings::settingsValves.mqttUriValve6);
@@ -689,7 +714,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve7, &Settings::settingsValves.useValve7);
     valveTab.voltageValve7 = ESPUI.addControl(ControlType::Text, "Output 7 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve7, &Settings::settingsValves.voltageValve7);
-    valveTab.selectScale7 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale7 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 7", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale7, &Settings::settingsValves.selectScale7);
     valveTab.mqttUriValve7 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 7:", "/home/smart_garden/actuator7", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve7, &Settings::settingsValves.mqttUriValve7);
@@ -698,7 +723,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve8, &Settings::settingsValves.useValve8);
     valveTab.voltageValve8 = ESPUI.addControl(ControlType::Text, "Output 8 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve8, &Settings::settingsValves.voltageValve8);
-    valveTab.selectScale8 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale8 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 8", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale8, &Settings::settingsValves.selectScale8);
     valveTab.mqttUriValve8 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 8:", "/home/smart_garden/actuator8", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve8, &Settings::settingsValves.mqttUriValve8);
@@ -707,7 +732,7 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve9, &Settings::settingsValves.useValve9);
     valveTab.voltageValve9 = ESPUI.addControl(ControlType::Text, "Output 9 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve9, &Settings::settingsValves.voltageValve9);
-    valveTab.selectScale9 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale9 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 9", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale9, &Settings::settingsValves.selectScale9);
     valveTab.mqttUriValve9 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 9:", "/home/smart_garden/actuator9", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve9, &Settings::settingsValves.mqttUriValve9);
@@ -716,22 +741,22 @@ void setupValveTab(uint16_t parentTab) {
     tabValve.addElement<bool>(valveTab.useValve10, &Settings::settingsValves.useValve10);
     valveTab.voltageValve10 = ESPUI.addControl(ControlType::Text, "Output 10 Voltage", "5.0", ControlColor::Emerald, parentTab, &updateValue);
     tabValve.addElement<float>(valveTab.voltageValve10, &Settings::settingsValves.voltageValve10);
-    valveTab.selectScale10 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "", ControlColor::Emerald, parentTab, &selectScale );
+    valveTab.selectScale10 = ESPUI.addControl( ControlType::Select, "Use with Scale:", "Scale Sensor 10", ControlColor::Emerald, parentTab, &selectScale );
     tabValve.addElement<uint8_t>(valveTab.selectScale10, &Settings::settingsValves.selectScale10);
     valveTab.mqttUriValve10 = ESPUI.addControl( ControlType::Text, "MQTT Uri Valve 10:", "/home/smart_garden/actuator10", ControlColor::Emerald, parentTab, &updateValue );
     tabValve.addElement<String>(valveTab.mqttUriValve10, &Settings::settingsValves.mqttUriValve10);
 
     for (int i=0; i<NR_OF_SCALES; i++) {
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 1", "Scale1", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 2", "Scale2", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 3", "Scale3", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 4", "Scale4", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 5", "Scale5", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 6", "Scale6", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 7", "Scale7", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 8", "Scale8", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 9", "Scale9", ControlColor::Alizarin, *valveTab.selectElements[i] );
-        ESPUI.addControl( ControlType::Option, "Scale Sensor 10", "Scale10", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 1", "1", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 2", "2", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 3", "3", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 4", "4", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 5", "5", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 6", "6", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 7", "7", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 8", "8", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 9", "9", ControlColor::Alizarin, *valveTab.selectElements[i] );
+        ESPUI.addControl( ControlType::Option, "Scale Sensor 10", "10", ControlColor::Alizarin, *valveTab.selectElements[i] );
     }
 
 }

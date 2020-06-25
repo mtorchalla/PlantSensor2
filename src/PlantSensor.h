@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+
+
 void loop();
 void setup();
 void waitUntilPublished();
@@ -19,6 +21,6 @@ void calibrate_scales();
 void startBME();
 boolean checkBatteryLevelLow();
 boolean checkBatteryLevelWarning();
-
+void startCloudUpdate();
 
 #endif //PLANTSENSOR_PLANTSENSOR_H

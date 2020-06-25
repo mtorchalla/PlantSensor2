@@ -1,30 +1,32 @@
 #line 2 "PlantSensor.cpp"
 
-
-#define TEST_UI
-//#define TEST_RUN
-
 #include <Arduino.h>
 #include "PlantSensor.h"
 #include "ConfigSensorTemp.h"
 #include "ConfigScale.h"
 #include "ConfigBattery.h"
 #include "ConfigWifi.h"
+#include "ConfigLux.h"
 #include "WebUi.h"
 #include "SettingsManager.h"
 #include <Wire.h>
-#include "Max44009.h"
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
 #include "Settings.h"
 #include <SPI.h>
 #include <WiFi.h>
 #include <nvs_flash.h>
+#include <Update.h>
+#include <WiFiClientSecure.h>
+#include "Pins.h"
+
+#define TEST_UI
+//#define TEST_RUN
+
 //#ifdef TEST_RUN
 //    #include <AUnit.h>
 //    #include "tests/testPreferenceManager.h"
 //#endif
-//#include <Update.h>
 //#include <AsyncTCP.h>
 //#include <WiFiUdp.h>
 //#include <BME280I2C.h>
@@ -33,7 +35,7 @@
 
 float batteryLevel = 0;
 char batteryLevelBuffer[16] {};
-float luxValue = 0;
+//float luxValue = 0;
 double scaleValue;
 
 RTC_DATA_ATTR static char bufferWifiSSid[32] = "";
@@ -51,9 +53,6 @@ RTC_DATA_ATTR static char bufferMqttUriPres[128] = "";
 RTC_DATA_ATTR static char bufferMqttUriLux[128] = "";
 
 
-Max44009 SensorLux(0x4A, 4, 5);
-#define luxMid 5
-char luxBuffer[16];
 
 RTC_DATA_ATTR bool firstStart = true;
 
@@ -84,10 +83,15 @@ IPAddress mqttServerAddress;
 //}
 
 void setup() {
+    pinMode(2, OUTPUT);
     pinMode(GPIO_Battery_READ, INPUT);
-    log_i("Starting");
+    pinMode(PIN_LED, OUTPUT);
+    digitalWrite(PIN_LED, HIGH);
+    log_i("Starting New prog__________________");
     #if defined(DEBUG) || defined(TEST_RUN) || defined(TEST_UI)
     Serial.begin(115200);
+    while(!Serial) {} // Wait
+    Wire.begin(21, 22);
     #endif
 	/*WiFi.disconnect();
 	WiFi.mode(WIFI_OFF);
@@ -99,12 +103,13 @@ void setup() {
 	*/
 #ifndef TEST_RUN
     SettingsManager settingsManager = SettingsManager();
+    digitalWrite(PIN_LED, LOW);
 #ifdef TEST_UI
     setup_espui(settingsManager);
     return;
 #endif
     if (firstStart && settingsManager.firstStartUp()) setup_espui(settingsManager); // is first start up ever?
-    if (firstStart) { // is not startup after deep sleep?
+    if (firstStart) {  // is not startup after deep sleep?
         settingsManager.getConfigNetwork();
         settingsManager.getConfigBattery();
         settingsManager.getConfigBme();
@@ -181,7 +186,7 @@ void setup() {
             myMqttClient.publish(Scales[i]->settings->ScaleMqttUri.value.c_str(), Scales[i]->scaleValueBuffer);
 			log_d("Publishing Scale Value: %s", Scales[i]->scaleValueBuffer);
 		}
-        myMqttClient.publish(bufferMqttUriLux, luxBuffer);
+        myMqttClient.publish(bufferMqttUriLux, luxValueBuffer);
         myMqttClient.publish(bufferMqttUriTemp, tempValueBuffer);
         myMqttClient.publish(bufferMqttUriHum, humValueBuffer);
         myMqttClient.publish(bufferMqttUriPres, presValueBuffer);
@@ -241,39 +246,8 @@ inline bool checkBatteryLevelWarning() {
     return (getBatteryVoltage() < SHUTDOWN_VOLTAGE + 0.15);
 }
 
-void inline readLux() {
-    luxValue = 0;
-	if (SensorLux.getError() == 0) {
-		for (int i = 1; i < luxMid; i++) {
-            luxValue += SensorLux.getLux();
-			delay(5);
-		}
-        luxValue = luxValue / luxMid;
-		snprintf(luxBuffer, sizeof(luxBuffer), "%.1f", luxValue);
-        log_d("Updating Lux: %f", luxValue);
-	}
-}
-
-void inline readBME() {
-    log_d("Begin reading BME...");
-	startBME();
-	SensorBme.read(pres, temp, hum, tempUnit, presUnit);
-	// Pressure Exception:
-	uint8_t retries = 0;
-	while (pres <= 0.65 && retries <= 5) {
-		startBME();
-		SensorBme.read(pres, temp, hum, tempUnit, presUnit);
-		retries++;
-	}
-	snprintf(tempValueBuffer, sizeof(tempValueBuffer), "%.1f", temp);
-	snprintf(humValueBuffer, sizeof(humValueBuffer), "%.1f", hum);
-	snprintf(presValueBuffer, sizeof(presValueBuffer), "%.4f", pres);
-	log_d("Updating BME: T=%s, H=%s, P=%s", tempValueBuffer, humValueBuffer, presValueBuffer);
-}
-
-void inline startBME() {
-    if (!SensorBme.begin()) SensorBme.begin();
-}
+unsigned long blink_timer = 0;
+bool state_led = false;
 
 void debug_menu()
 {
@@ -282,8 +256,228 @@ void debug_menu()
 	delay(10);
 	digitalWrite(0, HIGH);
 	start_ota();
-	calibrate_scales();
+//	calibrate_scales();
+	if (millis() > blink_timer + 2000) {
+	    state_led = !state_led;
+	    digitalWrite(PIN_LED, state_led);
+	    blink_timer = millis();
+	}
+	if (digitalRead(PIN_VBAT_UPDATE) == LOW) {
+	    startCloudUpdate();
+	}
 }
+
+String getHeaderValue(String header, String headerName) {
+    return header.substring(strlen(headerName.c_str()));
+}
+
+void startCloudUpdate() {
+    const char* fingerprint = "cc aa 48 48 66 46 0e 91 53 2c 9c 7c 23 2a b1 74 4d 29 9d 33";
+
+    const char* host = "raw.githubusercontent.com";
+    const char* urlBin = "/mtorchalla/PlantSensor/master/PlantSensor/Release/PlantSensor.ino.bin";
+    const char* urlFW = "/mtorchalla/PlantSensor/master/PlantSensor/FWVersion.h";
+    const char* fw_url_bin = "https://raw.githubusercontent.com/mtorchalla/PlantSensor/master/PlantSensor/Release/PlantSensor.ino.bin";
+    const char* fw_url_ver = "https://raw.githubusercontent.com/mtorchalla/PlantSensor/master/PlantSensor/Version.h";
+
+    long contentLength = 0;
+    bool isValidContentType = false;
+
+    log_d("Checking for firmware updates.");
+    reconnect();
+    const String s_fw_url_bin = String(fw_url_bin);
+    const String s_fw_url_ver = String(fw_url_ver);
+
+    configTime(3 * 3600, 0, "pool.ntp.org");
+
+    WiFiClientSecure httpsClient;
+    log_d("connecting to Git... ");
+//    httpsClient.setFingerprint(fingerprint);
+    if (!httpsClient.connect(host, 443)) {
+        log_d("connection failed");
+        return;
+    }
+
+    if (httpsClient.verify(fingerprint, host)) {
+        log_d("certificate matches");
+    }
+    else {
+        log_d("certificate doesn't match");
+        return;
+    }
+
+    httpsClient.print(String("GET ") + urlFW + " HTTP/1.1\r\n" +
+                      "Host: " + host + "\r\n" +
+                      "User-Agent: PlantSensor2\r\n" +
+                      "Connection: close\r\n\r\n");
+
+    while (httpsClient.connected()) {
+        String line = httpsClient.readStringUntil('\n');
+        if (line == "\r") {
+            log_d("headers received.");
+            break;
+        }
+    }
+    String line = httpsClient.readStringUntil('\n');
+    log_d("Read line: &s", line.c_str());
+    const uint32_t i_new_fw_version = line.substring(line.length() - 10).toInt();
+    log_d("FW Version Received: %i", i_new_fw_version);
+
+    if (i_new_fw_version > FW_VERSION) {
+        log_d("Updating Firmware...");
+
+        httpsClient.print(String("GET ") + urlBin + " HTTP/1.1\r\n" +
+                          "Host: " + host + "\r\n" +
+                          "Cache-Control: no-cache\r\n" +
+                          "Connection: close\r\n\r\n");
+        unsigned long timeout = millis();
+        while (httpsClient.available() == 0) {
+            if (millis() - timeout > 5000) {
+                Serial.println("Client Timeout !");
+                httpsClient.stop();
+                return;
+            }
+        }
+
+        while (httpsClient.available()) {
+            // read line till /n
+            String line = httpsClient.readStringUntil('\n');
+            // remove space, to check if the line is end of headers
+            line.trim();
+
+            // if the the line is empty,
+            // this is end of headers
+            // break the while and feed the
+            // remaining `client` to the
+            // Update.writeStream();
+            if (!line.length()) {
+                //headers ended
+                break; // and get the OTA started
+            }
+
+            // Check if the HTTP Response is 200
+            // else break and Exit Update
+            if (line.startsWith("HTTP/1.1")) {
+                if (line.indexOf("200") < 0) {
+                    Serial.println("Got a non 200 status code from server. Exiting OTA Update.");
+                    break;
+                }
+            }
+
+            // extract headers here
+            // Start with content length
+            if (line.startsWith("Content-Length: ")) {
+                contentLength = atol((getHeaderValue(line, "Content-Length: ")).c_str());
+                Serial.println("Got " + String(contentLength) + " bytes from server");
+            }
+
+            // Next, the content type
+            if (line.startsWith("Content-Type: ")) {
+                String contentType = getHeaderValue(line, "Content-Type: ");
+                Serial.println("Got " + contentType + " payload.");
+                if (contentType == "application/octet-stream") {
+                    isValidContentType = true;
+                }
+            }
+        }
+
+        if (contentLength && isValidContentType) {
+            // Check if there is enough to OTA Update
+            bool canBegin = Update.begin(contentLength);
+
+            // If yes, begin
+            if (canBegin) {
+                log_d("Begin OTA. This may take 2 - 5 mins to complete. Things might be quite for a while.. Patience!");
+                // No activity would appear on the Serial monitor
+                // So be patient. This may take 2 - 5mins to complete
+                size_t written = Update.writeStream(httpsClient);
+
+                if (written == contentLength) {
+                    Serial.println("Written : " + String(written) + " successfully");
+                } else {
+                    Serial.println("Written only : " + String(written) + "/" + String(contentLength) + ". Retry?");
+                    // retry??
+                    // execOTA();
+                }
+
+                if (Update.end()) {
+                    Serial.println("OTA done!");
+                    if (Update.isFinished()) {
+                        log_d("Update successfully completed. Rebooting.");
+                        ESP.restart();
+                    } else {
+                        log_e("Update not finished? Something went wrong!");
+                    }
+                } else {
+                    log_e("Error Occurred. Error #: %i", Update.getError());
+                }
+            } else {
+                // not enough space to begin OTA
+                // Understand the partitions and
+                // space availability
+                log_w("Not enough space to begin OTA");
+                httpsClient.flush();
+            }
+        } else {
+            log_w("There was no content in the response");
+            httpsClient.flush();
+        }
+
+//        auto ret = ESPhttpUpdate.update(httpsClient, s_fw_url_bin);  // old, esp8266
+        // Reboots after update
+        log_e("Update failed.");
+
+    } else {
+        log_d("FW Version is up to date!");
+    }
+}
+//    reset_pin0();
+    /*
+    HTTPClient httpClient;
+    httpClient.begin(s_fw_url_ver);
+    const int httpCode = httpClient.GET();
+    if (httpCode == 200) {
+        const String s_new_fw_version = httpClient.getString();
+        const uint32_t i_new_fw_version = s_new_fw_version.substring(s_new_fw_version.length() - 10).toInt();
+
+#ifdef debug
+        Serial.print("Current firmware version: ");
+        Serial.println(FW_VERSION);
+        Serial.print("Available firmware version (str): ");
+        Serial.println(s_new_fw_version);
+        Serial.print("Available firmware version (int): ");
+        Serial.println(i_new_fw_version);
+        Serial.println("Preparing to update");
+#endif
+        if (i_new_fw_version > FW_VERSION) {
+            const t_httpUpdate_return ret = ESPhttpUpdate.update(s_fw_url_bin);
+#ifdef debug
+            switch (ret) {
+            case HTTP_UPDATE_FAILED:
+                Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+                break;
+            case HTTP_UPDATE_NO_UPDATES:
+                Serial.println("HTTP_UPDATE_NO_UPDATES");
+                break;
+            default:
+                break;
+            }
+#endif
+        }
+#ifdef debug
+        else {
+            Serial.println("Already on latest version");
+        }
+#endif
+    }
+#ifdef debug
+    else {
+        Serial.print("Firmware version check failed, got HTTP response code ");
+        Serial.println(httpCode);
+    }
+#endif
+    httpClient.end(); */
+
 
 void start_ota()
 {

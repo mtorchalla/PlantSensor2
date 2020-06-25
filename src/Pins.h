@@ -1,0 +1,7 @@
+#ifndef PLANTSENSOR_PINS_H
+#define PLANTSENSOR_PINS_H
+
+#define PIN_LED 25
+#define PIN_VBAT_UPDATE 35
+
+#endif //PLANTSENSOR_PINS_H

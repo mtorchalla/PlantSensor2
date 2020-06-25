@@ -1,0 +1,1 @@
+C:\Users\Moritz\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.3/tools/espota.py -i 192.168.178.55 -p 8266 --auth= -f .pio\build\esp12e\firmware.bin

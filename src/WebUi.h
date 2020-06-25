@@ -11,6 +11,8 @@
 #include "SettingsManager.h"
 #include <WiFi.h>
 #include "ListUiElementWithSettings.h"
+#include "ConfigSensorTemp.h"
+#include "ConfigLux.h"
 #include <soc/rtc_wdt.h>
 
 class ListUiElementWithSettings;
