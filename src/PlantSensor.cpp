@@ -346,7 +346,7 @@ void startCloudUpdate() {
                           "Connection: close\r\n\r\n");
         unsigned long timeout = millis();
         while (httpsClient.available() == 0) {
-            if (millis() - timeout > 5000) {
+            if (millis() - timeout > 30000) {
                 Serial.println("Client Timeout !");
                 httpsClient.stop();
                 return;
