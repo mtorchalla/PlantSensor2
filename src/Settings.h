@@ -44,6 +44,6 @@
 #define MQTT_TOPIC_PLANT8		"/home/balkon/pflanze8/" //Scale sensor 4, Pins B+ B-
 
 #define UPDATE_INTERVAL 1000000*60*UPDATE_INTERVAL_MINUTES
-#define FW_VERSION 1
+//#define FW_VERSION 1
 
 #endif

@@ -18,6 +18,7 @@
 #include <nvs_flash.h>
 #include <Update.h>
 #include <WiFiClientSecure.h>
+#include "FWVersion.h"
 #include "Pins.h"
 
 #define TEST_UI
@@ -90,6 +91,7 @@ void setup() {
     log_i("Starting New prog__________________");
     #if defined(DEBUG) || defined(TEST_RUN) || defined(TEST_UI)
     Serial.begin(115200);
+    log_d("HELOO_________________________");
     while(!Serial) {} // Wait
     Wire.begin(21, 22);
     #endif
@@ -276,7 +278,6 @@ void debug_menu()
                 startCloudUpdate();
         }
     }
-//    setup_espui()
 }
 
 String getHeaderValue(String header, String headerName) {
