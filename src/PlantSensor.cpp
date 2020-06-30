@@ -339,7 +339,10 @@ void startCloudUpdate() {
 
     if (i_new_fw_version > FW_VERSION) {
         log_d("Updating Firmware...");
-
+        if (!httpsClient.connect(host, 443)) {
+            log_d("connection failed");
+            return;
+        }
         httpsClient.print(String("GET ") + urlBin + " HTTP/1.1\r\n" +
                           "Host: " + host + "\r\n" +
                           "Cache-Control: no-cache\r\n" +
