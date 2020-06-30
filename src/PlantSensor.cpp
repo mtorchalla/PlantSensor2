@@ -333,7 +333,7 @@ void startCloudUpdate() {
         }
     }
     String line = httpsClient.readStringUntil('\n');
-    log_d("Read line: &s", line.c_str());
+    log_d("Read line: %s", line.c_str());
     const uint32_t i_new_fw_version = line.substring(line.length() - 10).toInt();
     log_d("FW Version Received: %i", i_new_fw_version);
 
