@@ -94,10 +94,10 @@ void setup() {
     while(!Serial) {} // Wait
     Wire.begin(21, 22);
     #endif
-    debug_menu();
     if (digitalRead(PIN_VBAT_UPDATE) == 0) {
         delay(50);
-        if (digitalRead(PIN_VBAT_UPDATE) == 0) debug_menu();
+        if (digitalRead(PIN_VBAT_UPDATE) == 0)
+            debug_menu();
     }
 	/*WiFi.disconnect();
 	WiFi.mode(WIFI_OFF);
@@ -111,10 +111,12 @@ void setup() {
     SettingsManager settingsManager = SettingsManager();
     digitalWrite(PIN_LED, LOW);
 #ifdef TEST_UI
-    setup_espui(settingsManager);
+    setup_espui(settingsManager, false);
     return;
 #endif
-    if (firstStart && settingsManager.firstStartUp()) setup_espui(settingsManager); // is first start up ever?
+    if (firstStart && settingsManager.firstStartUp()) {
+        setup_espui(settingsManager, false); // is first start up ever?
+    }
     if (firstStart) {  // is not startup after deep sleep?
         settingsManager.getConfigNetwork();
         settingsManager.getConfigBattery();
@@ -255,17 +257,13 @@ inline bool checkBatteryLevelWarning() {
 unsigned long blink_timer = 0;
 bool state_led = false;
 
-void debug_menu()
-{
+void debug_menu() {
     log_d("Starting debug menu");
-    start_ota();
+//    start_ota();
     if (!Serial) Serial.begin(115200);
     unsigned long start_time = millis();
+    while (!digitalRead(PIN_VBAT_UPDATE)) { delay(20); }  // wait until button is released
     while (millis() < start_time + 4000) {
-        //	pinMode(0, OUTPUT);
-        //	delay(10);
-        //	digitalWrite(0, HIGH);
-        //	calibrate_scales();
         if (millis() > blink_timer + 150) {
             state_led = !state_led;
             digitalWrite(PIN_LED, state_led);
@@ -274,33 +272,30 @@ void debug_menu()
         if (digitalRead(PIN_VBAT_UPDATE) == LOW) {
             delay(50);
             if (digitalRead(PIN_VBAT_UPDATE) == LOW)
-                startCloudUpdate();
+                startCloudUpdate(false);
         }
     }
+    bool newFW = startCloudUpdate(true);
+    SettingsManager settingsManager = SettingsManager();
+    setup_espui(settingsManager, newFW);
+    return;
 }
 
 String getHeaderValue(String header, String headerName) {
     return header.substring(strlen(headerName.c_str()));
 }
 
-void startCloudUpdate() {
-    const char* fingerprint = "7094DEDDE6C469483A9270A14856782D1864E0B7";
-//    const uint8_t fingerprint[20] = {0x5F, 0x3f , 0x7a , 0xc2 , 0x56 , 0x9f , 0x50 , 0xa4 , 0x66 , 0x76 , 0x47 , 0xc6 , 0xa1 , 0x8c , 0xa0 , 0x07 , 0xaa , 0xed , 0xbb , 0x8e};
-
-
+bool startCloudUpdate(bool fw_version_only) {
+//    const char* fingerprint = "7094DEDDE6C469483A9270A14856782D1864E0B7";
     const char* host = "raw.githubusercontent.com";
     const char* urlBin = "/mtorchalla/PlantSensor2/master/.pio/build/esp32dev/firmware.bin";
     const char* urlFW  = "/mtorchalla/PlantSensor2/master/src/FWVersion.h";
-//    const char* fw_url_bin = "https://raw.githubusercontent.com/mtorchalla/PlantSensor2/master/.pio/build/esp32dev/firmware.bin";
-//    const char* fw_url_ver = "https://raw.githubusercontent.com/mtorchalla/PlantSensor2/master/src/FWVersion.h";
 
     long contentLength = 0;
     bool isValidContentType = false;
 
     log_d("Checking for firmware updates.");
     reconnect(false);
-//    const String s_fw_url_bin = String(fw_url_bin);
-//    const String s_fw_url_ver = String(fw_url_ver);
 
     configTime(3 * 3600, 0, "pool.ntp.org");
 
@@ -309,7 +304,7 @@ void startCloudUpdate() {
 //    httpsClient.setFingerprint(fingerprint);
     if (!httpsClient.connect(host, 443)) {
         log_d("connection failed");
-        return;
+        return false;
     }
 
 //    if (httpsClient.verify(fingerprint, host)) {
@@ -336,7 +331,8 @@ void startCloudUpdate() {
     log_d("Read line: %s", line.c_str());
     const uint32_t i_new_fw_version = line.substring(line.length() - 10).toInt();
     log_d("FW Version Received: %i", i_new_fw_version);
-
+    if (fw_version_only)
+        return true;
     if (i_new_fw_version > FW_VERSION) {
         log_d("Updating Firmware...");
         log_d("Free RAM: %i", ESP.getFreeHeap());
@@ -345,7 +341,7 @@ void startCloudUpdate() {
         httpsClient.stop();
         if (!httpsClient.connect(host, 443)) {
             log_d("connection failed");
-            return;
+            return false;
         }
         httpsClient.print(String("GET ") + urlBin + " HTTP/1.1\r\n" +
                           "Host: " + host + "\r\n" +
@@ -356,28 +352,16 @@ void startCloudUpdate() {
             if (millis() - timeout > 30000) {
                 Serial.println("Client Timeout !");
                 httpsClient.stop();
-                return;
+                return false;
             }
         }
 
         while (httpsClient.available()) {
-            // read line till /n
             String line = httpsClient.readStringUntil('\n');
-            // remove space, to check if the line is end of headers
             line.trim();
-
-            // if the the line is empty,
-            // this is end of headers
-            // break the while and feed the
-            // remaining `client` to the
-            // Update.writeStream();
             if (!line.length()) {
-                //headers ended
-                break; // and get the OTA started
+                break; // and get the OTA started //headers ended
             }
-
-            // Check if the HTTP Response is 200
-            // else break and Exit Update
             if (line.startsWith("HTTP/1.1")) {
                 if (line.indexOf("200") < 0) {
                     Serial.println("Got a non 200 status code from server. Exiting OTA Update.");
@@ -385,14 +369,11 @@ void startCloudUpdate() {
                 }
             }
 
-            // extract headers here
-            // Start with content length
             if (line.startsWith("Content-Length: ")) {
                 contentLength = atol((getHeaderValue(line, "Content-Length: ")).c_str());
                 Serial.println("Got " + String(contentLength) + " bytes from server");
             }
 
-            // Next, the content type
             if (line.startsWith("Content-Type: ")) {
                 String contentType = getHeaderValue(line, "Content-Type: ");
                 Serial.println("Got " + contentType + " payload.");
@@ -403,22 +384,15 @@ void startCloudUpdate() {
         }
 
         if (contentLength && isValidContentType) {
-            // Check if there is enough to OTA Update
             bool canBegin = Update.begin(contentLength);
-
-            // If yes, begin
             if (canBegin) {
                 log_d("Begin OTA. This may take 2 - 5 mins to complete. Things might be quite for a while.. Patience!");
-                // No activity would appear on the Serial monitor
-                // So be patient. This may take 2 - 5mins to complete
                 size_t written = Update.writeStream(httpsClient);
 
                 if (written == contentLength) {
                     Serial.println("Written : " + String(written) + " successfully");
                 } else {
                     Serial.println("Written only : " + String(written) + "/" + String(contentLength) + ". Retry?");
-                    // retry??
-                    // execOTA();
                 }
 
                 if (Update.end()) {
@@ -433,9 +407,6 @@ void startCloudUpdate() {
                     log_e("Error Occurred. Error #: %i", Update.getError());
                 }
             } else {
-                // not enough space to begin OTA
-                // Understand the partitions and
-                // space availability
                 log_w("Not enough space to begin OTA");
                 httpsClient.flush();
             }
@@ -443,69 +414,16 @@ void startCloudUpdate() {
             log_w("There was no content in the response");
             httpsClient.flush();
         }
-
-//        auto ret = ESPhttpUpdate.update(httpsClient, s_fw_url_bin);  // old, esp8266
-        // Reboots after update
         log_e("Update failed.");
-
     } else {
         log_d("FW Version is up to date!");
     }
+    return true;
 }
-//    reset_pin0();
-    /*
-    HTTPClient httpClient;
-    httpClient.begin(s_fw_url_ver);
-    const int httpCode = httpClient.GET();
-    if (httpCode == 200) {
-        const String s_new_fw_version = httpClient.getString();
-        const uint32_t i_new_fw_version = s_new_fw_version.substring(s_new_fw_version.length() - 10).toInt();
-
-#ifdef debug
-        Serial.print("Current firmware version: ");
-        Serial.println(FW_VERSION);
-        Serial.print("Available firmware version (str): ");
-        Serial.println(s_new_fw_version);
-        Serial.print("Available firmware version (int): ");
-        Serial.println(i_new_fw_version);
-        Serial.println("Preparing to update");
-#endif
-        if (i_new_fw_version > FW_VERSION) {
-            const t_httpUpdate_return ret = ESPhttpUpdate.update(s_fw_url_bin);
-#ifdef debug
-            switch (ret) {
-            case HTTP_UPDATE_FAILED:
-                Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-                break;
-            case HTTP_UPDATE_NO_UPDATES:
-                Serial.println("HTTP_UPDATE_NO_UPDATES");
-                break;
-            default:
-                break;
-            }
-#endif
-        }
-#ifdef debug
-        else {
-            Serial.println("Already on latest version");
-        }
-#endif
-    }
-#ifdef debug
-    else {
-        Serial.print("Firmware version check failed, got HTTP response code ");
-        Serial.println(httpCode);
-    }
-#endif
-    httpClient.end(); */
-
 
 inline void start_ota()
 {
     log_d("Starting OTA service");
-    SettingsManager settingsManager = SettingsManager();
-    settingsManager.getConfigNetwork();
-    WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
     reconnect(false);
     log_d("Connected.");
     ArduinoOTA.onStart([]() {
@@ -606,26 +524,29 @@ void calibrate_scales() {
 	}
 }
 
-// attempt to connect to the wifi if connection is lost
 bool reconnect(bool connectMqtt) {
-    WiFiEventId_t eventID = WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
-        Serial.print("WiFi lost connection. Reason: ");
-        Serial.println(info.disconnected.reason);
-        if (info.disconnected.reason == 202) {
-            WiFi.disconnect(true);
-            delay(10);
-            WiFi.mode(WIFI_STA);
-            SettingsManager settingsManager = SettingsManager();
-            settingsManager.getConfigNetwork();
-            WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
-//            Serial.println("Connection failed, REBOOT/SLEEP!");
-//            esp_sleep_enable_timer_wakeup(10);
-//            esp_deep_sleep_start();
-            delay(100);
-
-        }
-    }, WiFiEvent_t::SYSTEM_EVENT_STA_DISCONNECTED);
-
+//    WiFiEventId_t eventID = WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+//        Serial.print("WiFi lost connection. Reason: ");
+//        Serial.println(info.disconnected.reason);
+//        if (info.disconnected.reason == 202) {
+//            WiFi.disconnect(true);
+//            delay(10);
+//            WiFi.mode(WIFI_STA);
+//            SettingsManager settingsManager = SettingsManager();
+//            settingsManager.getConfigNetwork();
+//            WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
+////            Serial.println("Connection failed, REBOOT/SLEEP!");
+////            esp_sleep_enable_timer_wakeup(10);
+////            esp_deep_sleep_start();
+//            delay(100);
+//
+//        }
+//    }, WiFiEvent_t::SYSTEM_EVENT_STA_DISCONNECTED);
+    if (WiFi.SSID().isEmpty()) {
+        SettingsManager settingsManager = SettingsManager();
+        settingsManager.getConfigNetwork();
+        WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
+    }
 	if (WiFi.status() != WL_CONNECTED) {
 		log_d("Connecting to Wifi Network: %s", bufferWifiSSid);
 	    start_time = millis();

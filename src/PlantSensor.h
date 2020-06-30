@@ -22,6 +22,6 @@ void calibrate_scales();
 void startBME();
 boolean checkBatteryLevelLow();
 boolean checkBatteryLevelWarning();
-void startCloudUpdate();
+bool startCloudUpdate(bool fw_version_only);
 
 #endif //PLANTSENSOR_PLANTSENSOR_H

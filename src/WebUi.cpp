@@ -187,6 +187,7 @@ ListUiElementWithSettings* allUiElements[] = {
 uint16_t activeTab = 0;
 uint16_t status_akku = 0;
 uint16_t button_save = 0;
+uint16_t button_update = 0;
 uint16_t status_log = 0;
 SettingsManager settingsManager;
 
@@ -216,6 +217,10 @@ void loadTab(ListUiElementWithSettings &tab) {
 
         element = element->next;
     }
+}
+
+void updateFW(Control *sender, int type) {
+    startCloudUpdate(false);
 }
 
 void saveAndQuit(Control *sender, int type) {
@@ -429,16 +434,18 @@ void activateValve(Control* sender, int type) {
     if (sender->id == valveTab.useValve10) switchValveElement(valveTab.voltageValve10, valveTab.selectScale10, valveTab.mqttUriValve10, sender->value);
 }
 
-void setup_espui(SettingsManager& newSettingsManager) {
+void setup_espui(SettingsManager& newSettingsManager, bool newFW) {
     rtc_wdt_disable();
     settingsManager = newSettingsManager;
     ESPUI.setVerbosity(ESPUI_Verbosity::VerboseJSON);
 
-
+    WiFi.mode(WIFI_OFF);
+    WiFi.mode(WIFI_AP);
     WiFi.setHostname(ESPUI_hostname);
 
     // try to connect to existing network
-    WiFi.begin(ESPUI_ssid, ESPUI_password);
+
+//    WiFi.begin(ESPUI_ssid, ESPUI_password);
 
     uint8_t timeout = 10;
     // create hot spot
@@ -460,11 +467,16 @@ void setup_espui(SettingsManager& newSettingsManager) {
 
     dnsServer.start(DNS_PORT, "*", apIP);
 
-    log_d("WiFi parameters; Mode: %s; IP Address: %s", WiFi.getMode() == WIFI_AP ? "Station" : "Client", WiFi.getMode() == WIFI_AP ? WiFi.softAPIP() : WiFi.localIP());
+    log_d("WiFi parameters; Mode: %s; IP Address: %s", WiFi.getMode() == WIFI_AP ? "Station" : "Client", WiFi.getMode() == WIFI_AP ? WiFi.softAPIP().toString().c_str() : WiFi.localIP().toString().c_str());
 
     updateBatteryLevel();
     status_akku = ESPUI.addControl(ControlType::Label, "Battery Level:", batteryLevelBuffer, ControlColor::Sunflower);
-    status_log = ESPUI.addControl(ControlType::Label, "Status Message", "Please enter your data", ControlColor::Sunflower);
+    if (newFW) {
+        status_log = ESPUI.addControl(ControlType::Label, "Status Message", "New Firmware Version available!", ControlColor::Sunflower);
+    } else {
+        status_log = ESPUI.addControl(ControlType::Label, "Status Message", "Please enter your data", ControlColor::Sunflower);
+    }
+    button_update = ESPUI.addControl(ControlType::Button, "Update Firmware", "FW", ControlColor::Emerald, Control::noParent, &updateFW);
     button_save = ESPUI.addControl(ControlType::Button, "Save and Reboot", "Save", ControlColor::Emerald, Control::noParent, &saveAndQuit);
 
 
