@@ -88,10 +88,9 @@ void setup() {
     pinMode(GPIO_Battery_READ, INPUT);
     pinMode(PIN_LED, OUTPUT);
     digitalWrite(PIN_LED, HIGH);
-    log_i("Starting New prog__________________");
     #if defined(DEBUG) || defined(TEST_RUN) || defined(TEST_UI)
     Serial.begin(115200);
-    log_d("HELOO_________________________");
+    log_i("Starting With FW NR: %i", FW_VERSION);
     while(!Serial) {} // Wait
     Wire.begin(21, 22);
     #endif
