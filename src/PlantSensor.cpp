@@ -93,6 +93,11 @@ void setup() {
     while(!Serial) {} // Wait
     Wire.begin(21, 22);
     #endif
+    debug_menu();
+    if (digitalRead(PIN_VBAT_UPDATE) == 0) {
+        delay(50);
+        if (digitalRead(PIN_VBAT_UPDATE) == 0) debug_menu();
+    }
 	/*WiFi.disconnect();
 	WiFi.mode(WIFI_OFF);
 	WiFi.forceSleepBegin();
@@ -171,7 +176,7 @@ void setup() {
 	volatile uint8_t retries = 0;
 	log_d("Connecting to network...");
 	while (connected == false && retries <= 2) {
-		connected = reconnect();
+		connected = reconnect(true);
 		delay(100);
 		log_d("Number of retries: %i", retries);
 		retries++;
@@ -251,20 +256,27 @@ bool state_led = false;
 
 void debug_menu()
 {
-	Serial.begin(115200);
-	pinMode(0, OUTPUT);
-	delay(10);
-	digitalWrite(0, HIGH);
-	start_ota();
-//	calibrate_scales();
-	if (millis() > blink_timer + 2000) {
-	    state_led = !state_led;
-	    digitalWrite(PIN_LED, state_led);
-	    blink_timer = millis();
-	}
-	if (digitalRead(PIN_VBAT_UPDATE) == LOW) {
-	    startCloudUpdate();
-	}
+    log_d("Starting debug menu");
+    start_ota();
+    if (!Serial) Serial.begin(115200);
+    unsigned long start_time = millis();
+    while (millis() < start_time + 4000) {
+        //	pinMode(0, OUTPUT);
+        //	delay(10);
+        //	digitalWrite(0, HIGH);
+        //	calibrate_scales();
+        if (millis() > blink_timer + 150) {
+            state_led = !state_led;
+            digitalWrite(PIN_LED, state_led);
+            blink_timer = millis();
+        }
+        if (digitalRead(PIN_VBAT_UPDATE) == LOW) {
+            delay(50);
+            if (digitalRead(PIN_VBAT_UPDATE) == LOW)
+                startCloudUpdate();
+        }
+    }
+//    setup_espui()
 }
 
 String getHeaderValue(String header, String headerName) {
@@ -272,21 +284,23 @@ String getHeaderValue(String header, String headerName) {
 }
 
 void startCloudUpdate() {
-    const char* fingerprint = "cc aa 48 48 66 46 0e 91 53 2c 9c 7c 23 2a b1 74 4d 29 9d 33";
+    const char* fingerprint = "7094DEDDE6C469483A9270A14856782D1864E0B7";
+//    const uint8_t fingerprint[20] = {0x5F, 0x3f , 0x7a , 0xc2 , 0x56 , 0x9f , 0x50 , 0xa4 , 0x66 , 0x76 , 0x47 , 0xc6 , 0xa1 , 0x8c , 0xa0 , 0x07 , 0xaa , 0xed , 0xbb , 0x8e};
+
 
     const char* host = "raw.githubusercontent.com";
-    const char* urlBin = "/mtorchalla/PlantSensor2/master/PlantSensor/Release/PlantSensor.ino.bin";
-    const char* urlFW = "/mtorchalla/PlantSensor2/master/PlantSensor/FWVersion.h";
-    const char* fw_url_bin = "https://raw.githubusercontent.com/mtorchalla/PlantSensor/master/PlantSensor/Release/PlantSensor.ino.bin";
-    const char* fw_url_ver = "https://raw.githubusercontent.com/mtorchalla/PlantSensor/master/PlantSensor/Version.h";
+    const char* urlBin = "/mtorchalla/PlantSensor2/master/.pio/build/esp32dev/firmware.bin";
+    const char* urlFW  = "/mtorchalla/PlantSensor2/master/src/FWVersion.h";
+//    const char* fw_url_bin = "https://raw.githubusercontent.com/mtorchalla/PlantSensor2/master/.pio/build/esp32dev/firmware.bin";
+//    const char* fw_url_ver = "https://raw.githubusercontent.com/mtorchalla/PlantSensor2/master/src/FWVersion.h";
 
     long contentLength = 0;
     bool isValidContentType = false;
 
     log_d("Checking for firmware updates.");
-    reconnect();
-    const String s_fw_url_bin = String(fw_url_bin);
-    const String s_fw_url_ver = String(fw_url_ver);
+    reconnect(false);
+//    const String s_fw_url_bin = String(fw_url_bin);
+//    const String s_fw_url_ver = String(fw_url_ver);
 
     configTime(3 * 3600, 0, "pool.ntp.org");
 
@@ -298,13 +312,13 @@ void startCloudUpdate() {
         return;
     }
 
-    if (httpsClient.verify(fingerprint, host)) {
-        log_d("certificate matches");
-    }
-    else {
-        log_d("certificate doesn't match");
-        return;
-    }
+//    if (httpsClient.verify(fingerprint, host)) {
+//        log_d("certificate matches");
+//    }
+//    else {
+//        log_d("certificate doesn't match");
+//        return;
+//    }
 
     httpsClient.print(String("GET ") + urlFW + " HTTP/1.1\r\n" +
                       "Host: " + host + "\r\n" +
@@ -479,26 +493,39 @@ void startCloudUpdate() {
     httpClient.end(); */
 
 
-void start_ota()
+inline void start_ota()
 {
-	ArduinoOTA.onStart([]() {
-		log_d("Starting Arduino OTA");
-	});
-	ArduinoOTA.onEnd([]() {
-        log_d("Ending Arduino OTA");
-	});
-	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        log_d("Progress: %u%%\r", (progress / (total / 100)));
-	});
-	ArduinoOTA.onError([](ota_error_t error) {
-		log_e("ArduinoOta Error[%u]: ", error);
-		if (error == OTA_AUTH_ERROR) log_e("Auth Failed");
-		else if (error == OTA_BEGIN_ERROR) log_e("Begin Failed");
-		else if (error == OTA_CONNECT_ERROR) log_e("Connect Failed");
-		else if (error == OTA_RECEIVE_ERROR) log_e("Receive Failed");
-		else if (error == OTA_END_ERROR) log_e("End Failed");
-	});
-	ArduinoOTA.begin();
+    log_d("Starting OTA service");
+    SettingsManager settingsManager = SettingsManager();
+    settingsManager.getConfigNetwork();
+    WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
+    reconnect(false);
+    log_d("Connected.");
+    ArduinoOTA.onStart([]() {
+        String type;
+        if (ArduinoOTA.getCommand() == U_FLASH)
+            type = "sketch";
+        else // U_SPIFFS
+            type = "filesystem";
+
+        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+        log_i("Start updating %s", type.c_str());
+    });
+    ArduinoOTA.onEnd([]() {
+        log_i("\nEnd");
+    });
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    });
+    ArduinoOTA.onError([](ota_error_t error) {
+        Serial.printf("Error[%u]: ", error);
+        if (error == OTA_AUTH_ERROR) log_e("Auth Failed");
+        else if (error == OTA_BEGIN_ERROR) log_e("Begin Failed");
+        else if (error == OTA_CONNECT_ERROR) log_e("Connect Failed");
+        else if (error == OTA_RECEIVE_ERROR) log_e("Receive Failed");
+        else if (error == OTA_END_ERROR) log_e("End Failed");
+    });
+    ArduinoOTA.begin();
 }
 
 void calibrate_scales() {
@@ -573,14 +600,33 @@ void calibrate_scales() {
 }
 
 // attempt to connect to the wifi if connection is lost
-bool reconnect() {
+bool reconnect(bool connectMqtt) {
+    WiFiEventId_t eventID = WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+        Serial.print("WiFi lost connection. Reason: ");
+        Serial.println(info.disconnected.reason);
+        if (info.disconnected.reason == 202) {
+            WiFi.disconnect(true);
+            delay(10);
+            WiFi.mode(WIFI_STA);
+            SettingsManager settingsManager = SettingsManager();
+            settingsManager.getConfigNetwork();
+            WiFi.begin(Settings::settingsNetwork.WifiSSid.value.c_str(), Settings::settingsNetwork.WifiPass.value.c_str());
+//            Serial.println("Connection failed, REBOOT/SLEEP!");
+//            esp_sleep_enable_timer_wakeup(10);
+//            esp_deep_sleep_start();
+            delay(100);
+
+        }
+    }, WiFiEvent_t::SYSTEM_EVENT_STA_DISCONNECTED);
+
 	if (WiFi.status() != WL_CONNECTED) {
 		log_d("Connecting to Wifi Network: %s", bufferWifiSSid);
 	    start_time = millis();
 		current_time = millis();
-		while (WiFi.status() != WL_CONNECTED && start_time + 15*1000 > current_time) {
+		while (WiFi.status() != WL_CONNECTED && start_time + 10*1000 > current_time) {
 			delay(500);
 			current_time = millis();
+			Serial.println(WiFi.status());
 		}
 		if (WiFi.status() == WL_CONNECTED) {
             log_d("Wifi connected. IP Address: %s", WiFi.localIP().toString().c_str());
@@ -590,6 +636,9 @@ bool reconnect() {
 		}
 	}
 	// make sure we are connected to WIFI before attempting to reconnect to MQTT
+	if (!connectMqtt) {
+	    return true;
+	}
 	if (WiFi.status() == WL_CONNECTED) {
 		start_time = millis();
 		current_time = millis();

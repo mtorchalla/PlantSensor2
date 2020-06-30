@@ -14,8 +14,9 @@ void readBatteryLevel(int repeatMeasurement);
 void readLux();
 void setupScales();
 void readBME();
-bool reconnect();
-void debug_menu();
+bool reconnect(bool connectMqtt);
+
+[[noreturn]] void debug_menu();
 void start_ota();
 void calibrate_scales();
 void startBME();
