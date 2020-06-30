@@ -339,6 +339,10 @@ void startCloudUpdate() {
 
     if (i_new_fw_version > FW_VERSION) {
         log_d("Updating Firmware...");
+        log_d("Free RAM: %i", ESP.getFreeHeap());
+        log_d("%i", CONFIG_MBEDTLS_SSL_MAX_CONTENT_LEN);
+
+        httpsClient.stop();
         if (!httpsClient.connect(host, 443)) {
             log_d("connection failed");
             return;
