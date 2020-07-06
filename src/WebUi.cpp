@@ -12,6 +12,7 @@ const char *ESPUI_ssid = "ESPUI";
 const char *ESPUI_password = "espui";
 const char *ESPUI_hostname = "espui";
 static bool ui_setup_finished = false;
+static bool start_update = false;
 
 // Ui-Element Structs:
 ScalesTab scalesTab1;
@@ -220,7 +221,8 @@ void loadTab(ListUiElementWithSettings &tab) {
 }
 
 void updateFW(Control *sender, int type) {
-    startCloudUpdate(false);
+    ui_setup_finished = true;
+    start_update = true;
 }
 
 void saveAndQuit(Control *sender, int type) {
@@ -633,8 +635,9 @@ void loop_espui() {
         }
 
     }
+    if (start_update)
+        startCloudUpdate(false);
     ESP.restart();
-    delay(10000);
 }
 
 void setupBatteryTab(uint16_t parentTab) {

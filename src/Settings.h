@@ -4,10 +4,9 @@
 #define _SETTINGS_h
 
 #include <Arduino.h>
-#include "Secrets.h"
 
 #if defined(ARDUINO) && ARDUINO >= 100
-	#include "arduino.h"
+	#include "Arduino.h"
 #else
 	#include "WProgram.h"
 #endif

@@ -554,7 +554,7 @@ bool reconnect(bool connectMqtt) {
 		while (WiFi.status() != WL_CONNECTED && start_time + 10*1000 > current_time) {
 			delay(500);
 			current_time = millis();
-			Serial.println(WiFi.status());
+			Serial.println(WiFi.status());  //TODO handle when status = 4 / auth fail...?
 		}
 		if (WiFi.status() == WL_CONNECTED) {
             log_d("Wifi connected. IP Address: %s", WiFi.localIP().toString().c_str());
