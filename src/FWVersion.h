@@ -1,1 +1,1 @@
-#define FW_VERSION 0000000008
+#define FW_VERSION 9L
